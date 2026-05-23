@@ -6,7 +6,7 @@
   <title>Morning Planner</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/htm@3/dist/htm.umd.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -18,10 +18,7 @@
       color: #1a1a2e;
     }
 
-    .container {
-      max-width: 680px;
-      margin: 0 auto;
-    }
+    .container { max-width: 680px; margin: 0 auto; }
 
     /* ── header ─────────────────────────────────── */
 
@@ -233,10 +230,8 @@
     .advice-card.warn { border-left-color: #d69e2e; }
     .advice-card.bad  { border-left-color: #e53e3e; }
 
-    .advice-icon { font-size: 22px; flex-shrink: 0; }
-
-    .advice-body { flex: 1; min-width: 0; }
-
+    .advice-icon  { font-size: 22px; flex-shrink: 0; }
+    .advice-body  { flex: 1; min-width: 0; }
     .advice-name  { font-weight: 700; font-size: 14px; margin-bottom: 1px; }
     .advice-route { font-size: 11px; color: #bbb; margin-bottom: 4px; }
     .advice-msg   { font-size: 13px; color: #444; line-height: 1.45; }
@@ -257,15 +252,17 @@
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
-    /* global React, ReactDOM */
+  <script>
+    const html = htm.bind(React.createElement);
     const { useState, useEffect, useCallback } = React;
 
     // ── pure helpers ─────────────────────────────────────────────────────────
 
     function parseHHMM(str) {
       if (!str || !str.includes(':')) return null;
-      const [h, m] = str.split(':').map(Number);
+      const parts = str.split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
       const d = new Date();
       d.setHours(h, m, 0, 0);
       return d;
@@ -290,8 +287,8 @@
       return ['🌡️', 'Unknown'];
     }
 
-    const isRainy  = code => code >= 51 && code <= 82;
-    const isStormy = code => code >= 95;
+    const isRainy  = function(code) { return code >= 51 && code <= 82; };
+    const isStormy = function(code) { return code >= 95; };
 
     function sevCls(sev) {
       if (sev == null) return 'good';
@@ -303,73 +300,76 @@
     // ── advice (pure: reads state, returns objects) ───────────────────────────
 
     function boysAdvice(tube, trains, wx) {
-      const n      = tube?.northern;
-      const target = trains.find(t => t.isTarget);
+      const n      = tube && tube.northern;
+      const target = trains.find(function(t) { return t.isTarget; });
       const stormy = wx && isStormy(wx.code);
       const rainy  = wx && (isRainy(wx.code) || wx.rainProb > 50);
-      const umb    = rainy && !stormy ? ' ☂️ Umbrellas for everyone.' : '';
+      const umb    = (rainy && !stormy) ? ' ☂️ Umbrellas for everyone.' : '';
 
       if (stormy)
         return { leave: '07:00', lvl: 'bad',
           msg: '⛈️ Stormy weather — leave at 07:00 to have margin for the 07:42.' + umb };
       if (n && n.sev < 6)
         return { leave: '07:05', lvl: 'bad',
-          msg: `Severe Northern line disruption (${n.desc}) — leave at 07:05.${umb}` };
+          msg: 'Severe Northern line disruption (' + n.desc + ') — leave at 07:05.' + umb };
       if (n && n.sev < 10)
         return { leave: '07:10', lvl: 'warn',
-          msg: `Minor Northern line delays (${n.desc}) — leave at 07:10.${umb}` };
-      if (target?.cancelled)
+          msg: 'Minor Northern line delays (' + n.desc + ') — leave at 07:10.' + umb };
+      if (target && target.cancelled)
         return { leave: '07:15', lvl: 'warn',
-          msg: `07:42 is cancelled — leave at 07:15 and check the next train.${umb}` };
+          msg: '07:42 is cancelled — leave at 07:15 and check the next train.' + umb };
       if (target && target.expected !== target.aimed)
         return { leave: '07:20', lvl: 'warn',
-          msg: `07:42 expected at ${target.expected} — leave on time but allow margin.${umb}` };
+          msg: '07:42 expected at ' + target.expected + ' — leave on time but allow margin.' + umb };
       return { leave: '07:20', lvl: 'good',
-        msg: `Northern line running well — leave for the 07:42 at normal time.${umb}` };
+        msg: 'Northern line running well — leave for the 07:42 at normal time.' + umb };
     }
 
     function carlAdvice(tube, wx) {
-      const n      = tube?.northern;
-      const v      = tube?.victoria;
-      const rainy  = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const n      = tube && tube.northern;
+      const v      = tube && tube.victoria;
+      const rainy  = wx && (isRainy(wx.code) || wx.rainProb > 50);
       const umb    = rainy ? ' ☂️ Umbrella advised.' : '';
-      const nSev   = n?.sev ?? 10;
-      const vSev   = v?.sev ?? 10;
+      const nSev   = (n && n.sev != null) ? n.sev : 10;
+      const vSev   = (v && v.sev != null) ? v.sev : 10;
 
       if (nSev < 6 && vSev < 6)
         return { lvl: 'bad',
-          msg: `Both Northern and Victoria lines severely disrupted — expect significant delays.${umb}` };
+          msg: 'Both Northern and Victoria lines severely disrupted — expect significant delays.' + umb };
       if (nSev < 6)
         return { lvl: 'warn',
-          msg: `Severe Northern line issues (${n.desc}) — first leg may be very slow. Victoria line fine.${umb}` };
+          msg: 'Severe Northern line issues (' + n.desc + ') — first leg may be very slow. Victoria line fine.' + umb };
       if (vSev < 6)
         return { lvl: 'warn',
-          msg: `Victoria line severely disrupted (${v.desc}) — affects second leg to Oxford Circus.${umb}` };
+          msg: 'Victoria line severely disrupted (' + v.desc + ') — affects second leg to Oxford Circus.' + umb };
       if (nSev < 10 || vSev < 10) {
-        const affected = [nSev < 10 ? 'Northern' : null, vSev < 10 ? 'Victoria' : null]
-          .filter(Boolean).join(' & ');
-        return { lvl: 'warn', msg: `Minor delays on ${affected} — allow a little extra time.${umb}` };
+        const parts = [];
+        if (nSev < 10) parts.push('Northern');
+        if (vSev < 10) parts.push('Victoria');
+        return { lvl: 'warn',
+          msg: 'Minor delays on ' + parts.join(' & ') + ' — allow a little extra time.' + umb };
       }
-      return { lvl: 'good', msg: `Both lines running well — no issues expected to Oxford Circus.${umb}` };
+      return { lvl: 'good',
+        msg: 'Both lines running well — no issues expected to Oxford Circus.' + umb };
     }
 
     function emmaAdvice(tube, wx) {
-      const n     = tube?.northern;
-      const rainy = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const n     = tube && tube.northern;
+      const rainy = wx && (isRainy(wx.code) || wx.rainProb > 50);
       const umb   = rainy ? ' ☂️ Umbrella needed.' : '';
-      const sev   = n?.sev ?? 10;
+      const sev   = (n && n.sev != null) ? n.sev : 10;
 
       if (sev < 6)
         return { lvl: 'bad',
-          msg: `Severe Northern line disruption — consider alternatives to Moorgate (bus or Overground).${umb}` };
+          msg: 'Severe Northern line disruption — consider alternatives to Moorgate (bus or Overground).' + umb };
       if (sev < 10)
         return { lvl: 'warn',
-          msg: `Minor Northern line delays (${n.desc}) — leave a few minutes early.${umb}` };
-      return { lvl: 'good', msg: `Northern line running well — no issues to Moorgate.${umb}` };
+          msg: 'Minor Northern line delays (' + n.desc + ') — leave a few minutes early.' + umb };
+      return { lvl: 'good', msg: 'Northern line running well — no issues to Moorgate.' + umb };
     }
 
     function orlaAdvice(buses, busErr, wx) {
-      const rainy = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const rainy = wx && (isRainy(wx.code) || wx.rainProb > 50);
       const umb   = rainy ? ' ☂️ Umbrella needed.' : '';
 
       if (busErr || buses.length === 0)
@@ -378,17 +378,17 @@
       const next = buses[0];
       if (next.mins <= 2)
         return { lvl: 'warn',
-          msg: `Bus 50 in ${next.mins} min${next.mins !== 1 ? 's' : ''} — leave now!${umb}` };
+          msg: 'Bus 50 in ' + next.mins + ' min' + (next.mins !== 1 ? 's' : '') + ' — leave now!' + umb };
 
       const leaveAt = parseHHMM('07:30');
       const arrival = parseHHMM(next.expected);
       if (arrival && leaveAt && arrival <= leaveAt)
-        return { lvl: 'good', msg: `Next bus at ${next.expected} — fine for a 07:30 leave.${umb}` };
+        return { lvl: 'good', msg: 'Next bus at ' + next.expected + ' — fine for a 07:30 leave.' + umb };
 
       const second = buses[1];
       return { lvl: 'warn',
-        msg: `Next bus not until ${next.expected} — may be tight for 07:30.` +
-          (second ? ` Check the ${second.expected} bus.` : '') + umb };
+        msg: 'Next bus not until ' + next.expected + ' — may be tight for 07:30.' +
+          (second ? ' Check the ' + second.expected + ' bus.' : '') + umb };
     }
 
     // ── fetchers (write to state only — no DOM, no return values) ────────────
@@ -396,15 +396,16 @@
     async function fetchTube(setTube, setTubeErr) {
       try {
         const r = await fetch('https://api.tfl.gov.uk/Line/northern,victoria,elizabeth/Status');
-        if (!r.ok) throw new Error(`TfL HTTP ${r.status}`);
+        if (!r.ok) throw new Error('TfL HTTP ' + r.status);
         const data = await r.json();
         const result = {};
-        for (const line of data) {
-          const s = line.lineStatuses?.[0] ?? {};
+        for (let i = 0; i < data.length; i++) {
+          const line = data[i];
+          const s = (line.lineStatuses && line.lineStatuses[0]) || {};
           result[line.id] = {
-            sev:    s.statusSeverity             ?? 10,
-            desc:   s.statusSeverityDescription  ?? '—',
-            reason: s.reason                     ?? null,
+            sev:    s.statusSeverity            != null ? s.statusSeverity            : 10,
+            desc:   s.statusSeverityDescription != null ? s.statusSeverityDescription : '—',
+            reason: s.reason                    || null,
           };
         }
         setTube(result);
@@ -422,15 +423,16 @@
           '&hourly=precipitation_probability' +
           '&timezone=Europe%2FLondon&forecast_days=1';
         const r = await fetch(url);
-        if (!r.ok) throw new Error(`Weather HTTP ${r.status}`);
+        if (!r.ok) throw new Error('Weather HTTP ' + r.status);
         const data = await r.json();
-        const probs    = data.hourly?.precipitation_probability ?? [];
-        const rainProb = probs.length >= 10 ? Math.max(...probs.slice(6, 10)) : 0;
+        const probs    = (data.hourly && data.hourly.precipitation_probability) || [];
+        const slice    = probs.slice(6, 10);
+        const rainProb = slice.length > 0 ? Math.max.apply(null, slice) : 0;
         setWx({
           temp:     Math.round(data.current.temperature_2m),
           code:     data.current.weathercode,
           wind:     Math.round(data.current.windspeed_10m),
-          rainProb,
+          rainProb: rainProb,
         });
       } catch (e) {
         setWxErr(e.message);
@@ -445,29 +447,31 @@
           '&darwin=false&train_status=passenger&destination=ECR';
         const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
         const r = await fetch(url);
-        if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+        if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
         const wrapper = await r.json();
-        if (wrapper.status?.http_code && wrapper.status.http_code !== 200)
-          throw new Error(`Trains HTTP ${wrapper.status.http_code}`);
+        if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200)
+          throw new Error('Trains HTTP ' + wrapper.status.http_code);
         const data = JSON.parse(wrapper.contents);
 
         const now    = new Date();
         const cutoff = new Date(now.getTime() - 2 * 60 * 1000);
+        const all    = (data.departures && data.departures.all) || [];
 
-        const deps = (data.departures?.all ?? [])
-          .filter(d => d.destination_name?.toLowerCase().includes('croydon'))
-          .filter(d => {
-            const t = parseHHMM(d.expected_departure_time || d.aimed_departure_time);
-            return t && t >= cutoff;
-          })
-          .slice(0, 5)
-          .map(d => ({
-            aimed:     d.aimed_departure_time                     ?? '—',
+        const deps = [];
+        for (let i = 0; i < all.length; i++) {
+          const d = all[i];
+          if (!d.destination_name || d.destination_name.toLowerCase().indexOf('croydon') === -1) continue;
+          const t = parseHHMM(d.expected_departure_time || d.aimed_departure_time);
+          if (!t || t < cutoff) continue;
+          deps.push({
+            aimed:     d.aimed_departure_time                       || '—',
             expected:  d.expected_departure_time || d.aimed_departure_time || '—',
-            dest:      d.destination_name                         ?? 'East Croydon',
-            cancelled: (d.status ?? '').toUpperCase().includes('CANCEL'),
+            dest:      d.destination_name                           || 'East Croydon',
+            cancelled: (d.status || '').toUpperCase().indexOf('CANCEL') !== -1,
             isTarget:  d.aimed_departure_time === '07:42',
-          }));
+          });
+          if (deps.length === 5) break;
+        }
 
         setTrains(deps);
       } catch (e) {
@@ -478,24 +482,28 @@
     async function fetchBuses(setBuses, setBusErr) {
       try {
         const r = await fetch('https://api.tfl.gov.uk/StopPoint/490004889E/Arrivals');
-        if (!r.ok) throw new Error(`Buses HTTP ${r.status}`);
+        if (!r.ok) throw new Error('Buses HTTP ' + r.status);
         const data = await r.json();
 
         const route50 = data
-          .filter(b => b.lineName === '50')
-          .sort((a, b) => a.timeToStation - b.timeToStation)
+          .filter(function(b) { return b.lineName === '50'; })
+          .sort(function(a, b) { return a.timeToStation - b.timeToStation; })
           .slice(0, 4)
-          .map(b => ({
-            mins:     Math.round(b.timeToStation / 60),
-            dest:     b.destinationName,
-            expected: new Date(b.expectedArrival).toTimeString().slice(0, 5),
-          }));
+          .map(function(b) {
+            return {
+              mins:     Math.round(b.timeToStation / 60),
+              dest:     b.destinationName,
+              expected: new Date(b.expectedArrival).toTimeString().slice(0, 5),
+            };
+          });
 
         if (route50.length === 0) {
-          const lines = [...new Set(data.map(b => b.lineName))].sort().join(', ');
+          const lineSet = {};
+          data.forEach(function(b) { lineSet[b.lineName] = true; });
+          const lines = Object.keys(lineSet).sort().join(', ');
           setBusErr(
             data.length > 0
-              ? `No route 50 found. Lines at this stop: ${lines || 'none'}`
+              ? 'No route 50 found. Lines at this stop: ' + (lines || 'none')
               : 'No buses currently showing at this stop.'
           );
         } else {
@@ -509,80 +517,76 @@
     // ── sub-components (read from state, no fetching) ─────────────────────────
 
     function LineCard({ name, users, data, err }) {
-      const cls = err ? 'bad' : sevCls(data?.sev);
-      return (
-        <div className={`line-card ${cls}`}>
-          <div className="line-name">{name}</div>
-          <div className="line-users">{users}</div>
+      const cls = err ? 'bad' : sevCls(data && data.sev);
+      return html`
+        <div className=${'line-card ' + cls}>
+          <div className="line-name">${name}</div>
+          <div className="line-users">${users}</div>
           <div className="status-row">
-            <span className={`dot ${cls}`} />
+            <span className=${'dot ' + cls}></span>
             <span className="status-text">
-              {err ? 'Data error' : data ? data.desc : 'Loading…'}
+              ${err ? 'Data error' : data ? data.desc : 'Loading…'}
             </span>
           </div>
-          {!err && data?.reason && (
-            <div className="reason-text">{data.reason}</div>
-          )}
+          ${!err && data && data.reason && html`<div className="reason-text">${data.reason}</div>`}
         </div>
-      );
+      `;
     }
 
     function TrainsPanel({ trains, err }) {
-      return (
+      return html`
         <div className="panel">
           <div className="panel-title">Balham → East Croydon</div>
-          {err && <div className="error-msg">⚠️ {err}</div>}
-          {!err && trains.length === 0 && (
-            <div className="empty-msg">No upcoming departures found.</div>
-          )}
-          {trains.map((t, i) => {
+          ${err && html`<div className="error-msg">⚠️ ${err}</div>`}
+          ${!err && trains.length === 0 && html`<div className="empty-msg">No upcoming departures found.</div>`}
+          ${trains.map(function(t, i) {
             const late    = !t.cancelled && t.expected !== t.aimed;
             const statCls = t.cancelled ? 'cancelled' : late ? 'late' : 'on-time';
-            const statTxt = t.cancelled ? 'Cancelled' : late ? `Exp ${t.expected}` : 'On time';
-            return (
-              <div key={i} className={`dep-row${t.isTarget ? ' target' : ''}`}>
-                <span className="dep-aimed">{t.aimed}</span>
-                {t.isTarget && <span className="dep-star">★</span>}
-                <span className="dep-dest">{t.dest}</span>
-                <span className={`dep-status ${statCls}`}>{statTxt}</span>
+            const statTxt = t.cancelled ? 'Cancelled' : late ? ('Exp ' + t.expected) : 'On time';
+            return html`
+              <div key=${i} className=${'dep-row' + (t.isTarget ? ' target' : '')}>
+                <span className="dep-aimed">${t.aimed}</span>
+                ${t.isTarget && html`<span className="dep-star">★</span>`}
+                <span className="dep-dest">${t.dest}</span>
+                <span className=${'dep-status ' + statCls}>${statTxt}</span>
               </div>
-            );
+            `;
           })}
         </div>
-      );
+      `;
     }
 
     function BusPanel({ buses, err }) {
-      return (
+      return html`
         <div className="panel">
           <div className="panel-title">Bus 50 · Abbeville Rd</div>
-          {err && <div className="error-msg">⚠️ {err}</div>}
-          {!err && buses.length === 0 && (
-            <div className="empty-msg">No bus data available.</div>
-          )}
-          {buses.map((b, i) => (
-            <div key={i} className="dep-row">
-              <span className="dep-aimed">{b.expected}</span>
-              <span className="dep-dest">{b.dest}</span>
-              <span className="bus-mins">{b.mins} min{b.mins !== 1 ? 's' : ''}</span>
-            </div>
-          ))}
+          ${err && html`<div className="error-msg">⚠️ ${err}</div>`}
+          ${!err && buses.length === 0 && html`<div className="empty-msg">No bus data available.</div>`}
+          ${buses.map(function(b, i) {
+            return html`
+              <div key=${i} className="dep-row">
+                <span className="dep-aimed">${b.expected}</span>
+                <span className="dep-dest">${b.dest}</span>
+                <span className="bus-mins">${b.mins} min${b.mins !== 1 ? 's' : ''}</span>
+              </div>
+            `;
+          })}
         </div>
-      );
+      `;
     }
 
     function AdviceCard({ icon, name, route, advice, leave }) {
-      return (
-        <div className={`advice-card ${advice.lvl}`}>
-          <div className="advice-icon">{icon}</div>
+      return html`
+        <div className=${'advice-card ' + advice.lvl}>
+          <div className="advice-icon">${icon}</div>
           <div className="advice-body">
-            <div className="advice-name">{name}</div>
-            <div className="advice-route">{route}</div>
-            <div className="advice-msg">{advice.msg}</div>
+            <div className="advice-name">${name}</div>
+            <div className="advice-route">${route}</div>
+            <div className="advice-msg">${advice.msg}</div>
           </div>
-          {leave && <div className="advice-leave">{leave}</div>}
+          ${leave && html`<div className="advice-leave">${leave}</div>`}
         </div>
-      );
+      `;
     }
 
     // ── app ──────────────────────────────────────────────────────────────────
@@ -600,7 +604,7 @@
       const [updated,   setUpdated]   = useState(null);
       const [loading,   setLoading]   = useState(false);
 
-      const refresh = useCallback(async () => {
+      const refresh = useCallback(async function() {
         setLoading(true);
         setTubeErr(null); setWxErr(null); setTrainsErr(null); setBusErr(null);
         await Promise.all([
@@ -613,91 +617,85 @@
         setLoading(false);
       }, []);
 
-      useEffect(() => {
+      useEffect(function() {
         refresh();
-        const t = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(t);
+        const t = setInterval(function() { setNow(new Date()); }, 1000);
+        return function() { clearInterval(t); };
       }, [refresh]);
 
-      const clock              = now.toTimeString().slice(0, 5);
-      const [wxIcon, wxDesc]   = wx ? wmoLookup(wx.code) : ['', ''];
-      const rainy              = wx && (isRainy(wx.code) || wx.rainProb > 50);
-      const stormy             = wx && isStormy(wx.code);
+      const clock            = now.toTimeString().slice(0, 5);
+      const wmoResult        = wx ? wmoLookup(wx.code) : ['', ''];
+      const wxIcon           = wmoResult[0];
+      const wxDesc           = wmoResult[1];
+      const rainy            = wx && (isRainy(wx.code) || wx.rainProb > 50);
+      const stormy           = wx && isStormy(wx.code);
 
       const bAdv = boysAdvice(tube, trains, wx);
       const cAdv = carlAdvice(tube, wx);
       const eAdv = emmaAdvice(tube, wx);
       const oAdv = orlaAdvice(buses, busErr, wx);
 
-      return (
+      const wxText = wx
+        ? (wxIcon + ' ' + wx.temp + '°C ' + wxDesc + ' · ' + wx.wind + ' km/h · ' + wx.rainProb + '% rain')
+        : wxErr ? '⚠️ Weather unavailable' : 'Loading weather…';
+
+      return html`
         <div className="container">
           <div className="app-title">Morning Planner</div>
 
           <div className="header">
-            <div className="clock">{clock}</div>
-            <div className="weather-pill">
-              {wx
-                ? `${wxIcon} ${wx.temp}°C ${wxDesc} · ${wx.wind} km/h · ${wx.rainProb}% rain`
-                : wxErr
-                  ? '⚠️ Weather unavailable'
-                  : 'Loading weather…'}
-            </div>
-            <button className="refresh-btn" onClick={refresh} disabled={loading}>
-              {loading ? '…' : '↻ Refresh'}
+            <div className="clock">${clock}</div>
+            <div className="weather-pill">${wxText}</div>
+            <button className="refresh-btn" onClick=${refresh} disabled=${loading}>
+              ${loading ? '…' : '↻ Refresh'}
             </button>
           </div>
 
-          {stormy && (
-            <div className="alert storm">⛈️ Storm warning — take care travelling today.</div>
-          )}
-          {rainy && !stormy && (
-            <div className="alert rain">🌧️ Rain expected this morning — umbrellas for everyone.</div>
-          )}
+          ${stormy && html`<div className="alert storm">⛈️ Storm warning — take care travelling today.</div>`}
+          ${rainy && !stormy && html`<div className="alert rain">🌧️ Rain expected this morning — umbrellas for everyone.</div>`}
 
           <div className="section-label">Line Status</div>
           <div className="line-grid">
-            <LineCard name="Northern line"  users="Boys · Emma · Carl"  data={tube.northern}  err={tubeErr} />
-            <LineCard name="Victoria line"  users="Carl (2nd leg)"       data={tube.victoria}  err={tubeErr} />
-            <LineCard name="Elizabeth line" users="Backup to Moorgate"   data={tube.elizabeth} err={tubeErr} />
+            <${LineCard} name="Northern line"  users="Boys · Emma · Carl"  data=${tube.northern}  err=${tubeErr} />
+            <${LineCard} name="Victoria line"  users="Carl (2nd leg)"       data=${tube.victoria}  err=${tubeErr} />
+            <${LineCard} name="Elizabeth line" users="Backup to Moorgate"   data=${tube.elizabeth} err=${tubeErr} />
           </div>
 
           <div className="dep-grid">
-            <TrainsPanel trains={trains} err={trainsErr} />
-            <BusPanel    buses={buses}   err={busErr}    />
+            <${TrainsPanel} trains=${trains} err=${trainsErr} />
+            <${BusPanel}    buses=${buses}   err=${busErr}    />
           </div>
 
           <div className="section-label">This Morning</div>
           <div className="advice-stack">
-            <AdviceCard
+            <${AdviceCard}
               icon="🎒" name="The boys"
               route="Northern → SWR → East Croydon"
-              advice={bAdv} leave={bAdv.leave}
+              advice=${bAdv} leave=${bAdv.leave}
             />
-            <AdviceCard
+            <${AdviceCard}
               icon="🚌" name="Orla"
               route="Bus 50 from Abbeville Road"
-              advice={oAdv} leave="07:30"
+              advice=${oAdv} leave="07:30"
             />
-            <AdviceCard
+            <${AdviceCard}
               icon="🚇" name="Carl"
               route="Northern → Victoria to Oxford Circus"
-              advice={cAdv}
+              advice=${cAdv}
             />
-            <AdviceCard
+            <${AdviceCard}
               icon="📍" name="Emma"
               route="Northern to Moorgate"
-              advice={eAdv}
+              advice=${eAdv}
             />
           </div>
 
-          {updated && (
-            <div className="footer">Updated {updated.toTimeString().slice(0, 5)}</div>
-          )}
+          ${updated && html`<div className="footer">Updated ${updated.toTimeString().slice(0, 5)}</div>`}
         </div>
-      );
+      `;
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
   </script>
 </body>
 </html>
