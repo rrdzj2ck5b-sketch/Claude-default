@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Morning Planner</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      padding: 16px 12px 40px;
+      min-height: 100vh;
+      color: #1a1a2e;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    /* ── header ─────────────────────────────────── */
+
+    .app-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #bbb;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .clock {
+      font-size: 34px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      flex-shrink: 0;
+    }
+
+    .weather-pill {
+      flex: 1;
+      background: white;
+      border-radius: 24px;
+      padding: 9px 16px;
+      font-size: 14px;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .refresh-btn {
+      background: white;
+      border: none;
+      border-radius: 24px;
+      padding: 9px 18px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .refresh-btn:hover:not(:disabled) { background: #eee; }
+    .refresh-btn:disabled { opacity: 0.45; cursor: default; }
+
+    /* ── alert banners ──────────────────────────── */
+
+    .alert {
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .alert.rain  { background: #ebf8ff; border: 1px solid #90cdf4; color: #1a5276; }
+    .alert.storm { background: #fff5f5; border: 1px solid #fc8181; color: #7b341e; }
+
+    /* ── section labels ─────────────────────────── */
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: #bbb;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      margin-top: 2px;
+    }
+
+    /* ── line status grid ───────────────────────── */
+
+    .line-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 420px) {
+      .line-grid { grid-template-columns: 1fr; }
+    }
+
+    .line-card {
+      background: white;
+      border-radius: 10px;
+      padding: 12px 12px 11px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      border-left: 4px solid #e2e8f0;
+    }
+    .line-card.good { border-left-color: #38a169; }
+    .line-card.warn { border-left-color: #d69e2e; }
+    .line-card.bad  { border-left-color: #e53e3e; }
+
+    .line-name  { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .line-users { font-size: 11px; color: #aaa; margin-bottom: 8px; }
+
+    .status-row { display: flex; align-items: center; gap: 6px; }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.good { background: #38a169; }
+    .dot.warn { background: #d69e2e; }
+    .dot.bad  { background: #e53e3e; }
+
+    .status-text { font-size: 12px; font-weight: 600; line-height: 1.2; }
+
+    .reason-text {
+      font-size: 11px;
+      color: #e53e3e;
+      margin-top: 5px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ── departures grid ────────────────────────── */
+
+    .dep-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 480px) {
+      .dep-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: white;
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .panel-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #ccc;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .dep-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 5px 0;
+      border-bottom: 1px solid #f7f7f5;
+      font-size: 13px;
+    }
+    .dep-row:last-child { border-bottom: none; }
+
+    .dep-row.target {
+      background: #fffbea;
+      margin: 0 -14px;
+      padding: 5px 14px;
+      font-weight: 700;
+    }
+
+    .dep-aimed  { font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 40px; }
+    .dep-star   { color: #d69e2e; flex-shrink: 0; }
+    .dep-dest   { flex: 1; color: #666; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dep-status { flex-shrink: 0; font-size: 12px; }
+    .dep-status.on-time   { color: #38a169; }
+    .dep-status.late      { color: #d69e2e; font-weight: 600; }
+    .dep-status.cancelled { color: #e53e3e; font-weight: 600; }
+
+    .bus-mins { flex-shrink: 0; font-size: 12px; color: #999; min-width: 52px; text-align: right; }
+
+    .error-msg { font-size: 13px; color: #e53e3e; line-height: 1.4; }
+    .empty-msg { font-size: 13px; color: #bbb; font-style: italic; }
+
+    /* ── advice cards ───────────────────────────── */
+
+    .advice-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .advice-card {
+      background: white;
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-left: 4px solid #e2e8f0;
+    }
+    .advice-card.good { border-left-color: #38a169; }
+    .advice-card.warn { border-left-color: #d69e2e; }
+    .advice-card.bad  { border-left-color: #e53e3e; }
+
+    .advice-icon { font-size: 22px; flex-shrink: 0; }
+
+    .advice-body { flex: 1; min-width: 0; }
+
+    .advice-name  { font-weight: 700; font-size: 14px; margin-bottom: 1px; }
+    .advice-route { font-size: 11px; color: #bbb; margin-bottom: 4px; }
+    .advice-msg   { font-size: 13px; color: #444; line-height: 1.45; }
+
+    .advice-leave {
+      font-size: 26px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: #1a1a2e;
+      flex-shrink: 0;
+    }
+
+    /* ── footer ─────────────────────────────────── */
+
+    .footer { text-align: right; font-size: 11px; color: #ccc; padding-top: 4px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    /* global React, ReactDOM */
+    const { useState, useEffect, useCallback } = React;
+
+    // ── pure helpers ─────────────────────────────────────────────────────────
+
+    function parseHHMM(str) {
+      if (!str || !str.includes(':')) return null;
+      const [h, m] = str.split(':').map(Number);
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      return d;
+    }
+
+    const WMO_MAP = {
+      0:  ['☀️',  'Clear sky'],
+      1:  ['🌤️', 'Mainly clear'],
+      2:  ['⛅',  'Partly cloudy'],
+      3:  ['☁️',  'Overcast'],
+      45: ['🌫️', 'Fog'],
+      48: ['🌫️', 'Fog'],
+    };
+
+    function wmoLookup(code) {
+      if (WMO_MAP[code]) return WMO_MAP[code];
+      if (code >= 51 && code <= 55) return ['🌦️', 'Drizzle'];
+      if (code >= 61 && code <= 65) return ['🌧️', 'Rain'];
+      if (code >= 71 && code <= 75) return ['❄️',  'Snow'];
+      if (code >= 80 && code <= 82) return ['🌦️', 'Showers'];
+      if (code >= 95) return ['⛈️', 'Thunderstorm'];
+      return ['🌡️', 'Unknown'];
+    }
+
+    const isRainy  = code => code >= 51 && code <= 82;
+    const isStormy = code => code >= 95;
+
+    function sevCls(sev) {
+      if (sev == null) return 'good';
+      if (sev < 6)  return 'bad';
+      if (sev < 10) return 'warn';
+      return 'good';
+    }
+
+    // ── advice (pure: reads state, returns objects) ───────────────────────────
+
+    function boysAdvice(tube, trains, wx) {
+      const n      = tube?.northern;
+      const target = trains.find(t => t.isTarget);
+      const stormy = wx && isStormy(wx.code);
+      const rainy  = wx && (isRainy(wx.code) || wx.rainProb > 50);
+      const umb    = rainy && !stormy ? ' ☂️ Umbrellas for everyone.' : '';
+
+      if (stormy)
+        return { leave: '07:00', lvl: 'bad',
+          msg: '⛈️ Stormy weather — leave at 07:00 to have margin for the 07:42.' + umb };
+      if (n && n.sev < 6)
+        return { leave: '07:05', lvl: 'bad',
+          msg: `Severe Northern line disruption (${n.desc}) — leave at 07:05.${umb}` };
+      if (n && n.sev < 10)
+        return { leave: '07:10', lvl: 'warn',
+          msg: `Minor Northern line delays (${n.desc}) — leave at 07:10.${umb}` };
+      if (target?.cancelled)
+        return { leave: '07:15', lvl: 'warn',
+          msg: `07:42 is cancelled — leave at 07:15 and check the next train.${umb}` };
+      if (target && target.expected !== target.aimed)
+        return { leave: '07:20', lvl: 'warn',
+          msg: `07:42 expected at ${target.expected} — leave on time but allow margin.${umb}` };
+      return { leave: '07:20', lvl: 'good',
+        msg: `Northern line running well — leave for the 07:42 at normal time.${umb}` };
+    }
+
+    function carlAdvice(tube, wx) {
+      const n      = tube?.northern;
+      const v      = tube?.victoria;
+      const rainy  = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const umb    = rainy ? ' ☂️ Umbrella advised.' : '';
+      const nSev   = n?.sev ?? 10;
+      const vSev   = v?.sev ?? 10;
+
+      if (nSev < 6 && vSev < 6)
+        return { lvl: 'bad',
+          msg: `Both Northern and Victoria lines severely disrupted — expect significant delays.${umb}` };
+      if (nSev < 6)
+        return { lvl: 'warn',
+          msg: `Severe Northern line issues (${n.desc}) — first leg may be very slow. Victoria line fine.${umb}` };
+      if (vSev < 6)
+        return { lvl: 'warn',
+          msg: `Victoria line severely disrupted (${v.desc}) — affects second leg to Oxford Circus.${umb}` };
+      if (nSev < 10 || vSev < 10) {
+        const affected = [nSev < 10 ? 'Northern' : null, vSev < 10 ? 'Victoria' : null]
+          .filter(Boolean).join(' & ');
+        return { lvl: 'warn', msg: `Minor delays on ${affected} — allow a little extra time.${umb}` };
+      }
+      return { lvl: 'good', msg: `Both lines running well — no issues expected to Oxford Circus.${umb}` };
+    }
+
+    function emmaAdvice(tube, wx) {
+      const n     = tube?.northern;
+      const rainy = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const umb   = rainy ? ' ☂️ Umbrella needed.' : '';
+      const sev   = n?.sev ?? 10;
+
+      if (sev < 6)
+        return { lvl: 'bad',
+          msg: `Severe Northern line disruption — consider alternatives to Moorgate (bus or Overground).${umb}` };
+      if (sev < 10)
+        return { lvl: 'warn',
+          msg: `Minor Northern line delays (${n.desc}) — leave a few minutes early.${umb}` };
+      return { lvl: 'good', msg: `Northern line running well — no issues to Moorgate.${umb}` };
+    }
+
+    function orlaAdvice(buses, busErr, wx) {
+      const rainy = wx && (isRainy(wx?.code) || wx?.rainProb > 50);
+      const umb   = rainy ? ' ☂️ Umbrella needed.' : '';
+
+      if (busErr || buses.length === 0)
+        return { lvl: 'warn', msg: (busErr || 'No bus data — check TfL for route 50.') + umb };
+
+      const next = buses[0];
+      if (next.mins <= 2)
+        return { lvl: 'warn',
+          msg: `Bus 50 in ${next.mins} min${next.mins !== 1 ? 's' : ''} — leave now!${umb}` };
+
+      const leaveAt = parseHHMM('07:30');
+      const arrival = parseHHMM(next.expected);
+      if (arrival && leaveAt && arrival <= leaveAt)
+        return { lvl: 'good', msg: `Next bus at ${next.expected} — fine for a 07:30 leave.${umb}` };
+
+      const second = buses[1];
+      return { lvl: 'warn',
+        msg: `Next bus not until ${next.expected} — may be tight for 07:30.` +
+          (second ? ` Check the ${second.expected} bus.` : '') + umb };
+    }
+
+    // ── fetchers (write to state only — no DOM, no return values) ────────────
+
+    async function fetchTube(setTube, setTubeErr) {
+      try {
+        const r = await fetch('https://api.tfl.gov.uk/Line/northern,victoria,elizabeth/Status');
+        if (!r.ok) throw new Error(`TfL HTTP ${r.status}`);
+        const data = await r.json();
+        const result = {};
+        for (const line of data) {
+          const s = line.lineStatuses?.[0] ?? {};
+          result[line.id] = {
+            sev:    s.statusSeverity             ?? 10,
+            desc:   s.statusSeverityDescription  ?? '—',
+            reason: s.reason                     ?? null,
+          };
+        }
+        setTube(result);
+      } catch (e) {
+        setTubeErr(e.message);
+      }
+    }
+
+    async function fetchWeather(setWx, setWxErr) {
+      try {
+        const url =
+          'https://api.open-meteo.com/v1/forecast' +
+          '?latitude=51.5074&longitude=-0.1278' +
+          '&current=temperature_2m,weathercode,windspeed_10m' +
+          '&hourly=precipitation_probability' +
+          '&timezone=Europe%2FLondon&forecast_days=1';
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Weather HTTP ${r.status}`);
+        const data = await r.json();
+        const probs    = data.hourly?.precipitation_probability ?? [];
+        const rainProb = probs.length >= 10 ? Math.max(...probs.slice(6, 10)) : 0;
+        setWx({
+          temp:     Math.round(data.current.temperature_2m),
+          code:     data.current.weathercode,
+          wind:     Math.round(data.current.windspeed_10m),
+          rainProb,
+        });
+      } catch (e) {
+        setWxErr(e.message);
+      }
+    }
+
+    async function fetchTrains(setTrains, setTrainsErr) {
+      try {
+        const base =
+          'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
+          '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
+          '&darwin=false&train_status=passenger&destination=ECR';
+        const url = 'https://corsproxy.io/?' + encodeURIComponent(base);
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Trains HTTP ${r.status}`);
+        const data = await r.json();
+
+        const now    = new Date();
+        const cutoff = new Date(now.getTime() - 2 * 60 * 1000);
+
+        const deps = (data.departures?.all ?? [])
+          .filter(d => d.destination_name?.toLowerCase().includes('croydon'))
+          .filter(d => {
+            const t = parseHHMM(d.expected_departure_time || d.aimed_departure_time);
+            return t && t >= cutoff;
+          })
+          .slice(0, 5)
+          .map(d => ({
+            aimed:     d.aimed_departure_time                     ?? '—',
+            expected:  d.expected_departure_time || d.aimed_departure_time || '—',
+            dest:      d.destination_name                         ?? 'East Croydon',
+            cancelled: (d.status ?? '').toUpperCase().includes('CANCEL'),
+            isTarget:  d.aimed_departure_time === '07:42',
+          }));
+
+        setTrains(deps);
+      } catch (e) {
+        setTrainsErr(e.message);
+      }
+    }
+
+    async function fetchBuses(setBuses, setBusErr) {
+      try {
+        const r = await fetch('https://api.tfl.gov.uk/StopPoint/490004889E/Arrivals');
+        if (!r.ok) throw new Error(`Buses HTTP ${r.status}`);
+        const data = await r.json();
+
+        const route50 = data
+          .filter(b => b.lineName === '50')
+          .sort((a, b) => a.timeToStation - b.timeToStation)
+          .slice(0, 4)
+          .map(b => ({
+            mins:     Math.round(b.timeToStation / 60),
+            dest:     b.destinationName,
+            expected: new Date(b.expectedArrival).toTimeString().slice(0, 5),
+          }));
+
+        if (route50.length === 0) {
+          const lines = [...new Set(data.map(b => b.lineName))].sort().join(', ');
+          setBusErr(
+            data.length > 0
+              ? `No route 50 found. Lines at this stop: ${lines || 'none'}`
+              : 'No buses currently showing at this stop.'
+          );
+        } else {
+          setBuses(route50);
+        }
+      } catch (e) {
+        setBusErr(e.message);
+      }
+    }
+
+    // ── sub-components (read from state, no fetching) ─────────────────────────
+
+    function LineCard({ name, users, data, err }) {
+      const cls = err ? 'bad' : sevCls(data?.sev);
+      return (
+        <div className={`line-card ${cls}`}>
+          <div className="line-name">{name}</div>
+          <div className="line-users">{users}</div>
+          <div className="status-row">
+            <span className={`dot ${cls}`} />
+            <span className="status-text">
+              {err ? 'Data error' : data ? data.desc : 'Loading…'}
+            </span>
+          </div>
+          {!err && data?.reason && (
+            <div className="reason-text">{data.reason}</div>
+          )}
+        </div>
+      );
+    }
+
+    function TrainsPanel({ trains, err }) {
+      return (
+        <div className="panel">
+          <div className="panel-title">Balham → East Croydon</div>
+          {err && <div className="error-msg">⚠️ {err}</div>}
+          {!err && trains.length === 0 && (
+            <div className="empty-msg">No upcoming departures found.</div>
+          )}
+          {trains.map((t, i) => {
+            const late    = !t.cancelled && t.expected !== t.aimed;
+            const statCls = t.cancelled ? 'cancelled' : late ? 'late' : 'on-time';
+            const statTxt = t.cancelled ? 'Cancelled' : late ? `Exp ${t.expected}` : 'On time';
+            return (
+              <div key={i} className={`dep-row${t.isTarget ? ' target' : ''}`}>
+                <span className="dep-aimed">{t.aimed}</span>
+                {t.isTarget && <span className="dep-star">★</span>}
+                <span className="dep-dest">{t.dest}</span>
+                <span className={`dep-status ${statCls}`}>{statTxt}</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function BusPanel({ buses, err }) {
+      return (
+        <div className="panel">
+          <div className="panel-title">Bus 50 · Abbeville Rd</div>
+          {err && <div className="error-msg">⚠️ {err}</div>}
+          {!err && buses.length === 0 && (
+            <div className="empty-msg">No bus data available.</div>
+          )}
+          {buses.map((b, i) => (
+            <div key={i} className="dep-row">
+              <span className="dep-aimed">{b.expected}</span>
+              <span className="dep-dest">{b.dest}</span>
+              <span className="bus-mins">{b.mins} min{b.mins !== 1 ? 's' : ''}</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function AdviceCard({ icon, name, route, advice, leave }) {
+      return (
+        <div className={`advice-card ${advice.lvl}`}>
+          <div className="advice-icon">{icon}</div>
+          <div className="advice-body">
+            <div className="advice-name">{name}</div>
+            <div className="advice-route">{route}</div>
+            <div className="advice-msg">{advice.msg}</div>
+          </div>
+          {leave && <div className="advice-leave">{leave}</div>}
+        </div>
+      );
+    }
+
+    // ── app ──────────────────────────────────────────────────────────────────
+
+    function App() {
+      const [tube,      setTube]      = useState({});
+      const [tubeErr,   setTubeErr]   = useState(null);
+      const [wx,        setWx]        = useState(null);
+      const [wxErr,     setWxErr]     = useState(null);
+      const [trains,    setTrains]    = useState([]);
+      const [trainsErr, setTrainsErr] = useState(null);
+      const [buses,     setBuses]     = useState([]);
+      const [busErr,    setBusErr]    = useState(null);
+      const [now,       setNow]       = useState(new Date());
+      const [updated,   setUpdated]   = useState(null);
+      const [loading,   setLoading]   = useState(false);
+
+      const refresh = useCallback(async () => {
+        setLoading(true);
+        setTubeErr(null); setWxErr(null); setTrainsErr(null); setBusErr(null);
+        await Promise.all([
+          fetchTube(setTube, setTubeErr),
+          fetchWeather(setWx, setWxErr),
+          fetchTrains(setTrains, setTrainsErr),
+          fetchBuses(setBuses, setBusErr),
+        ]);
+        setUpdated(new Date());
+        setLoading(false);
+      }, []);
+
+      useEffect(() => {
+        refresh();
+        const t = setInterval(() => setNow(new Date()), 1000);
+        return () => clearInterval(t);
+      }, [refresh]);
+
+      const clock              = now.toTimeString().slice(0, 5);
+      const [wxIcon, wxDesc]   = wx ? wmoLookup(wx.code) : ['', ''];
+      const rainy              = wx && (isRainy(wx.code) || wx.rainProb > 50);
+      const stormy             = wx && isStormy(wx.code);
+
+      const bAdv = boysAdvice(tube, trains, wx);
+      const cAdv = carlAdvice(tube, wx);
+      const eAdv = emmaAdvice(tube, wx);
+      const oAdv = orlaAdvice(buses, busErr, wx);
+
+      return (
+        <div className="container">
+          <div className="app-title">Morning Planner</div>
+
+          <div className="header">
+            <div className="clock">{clock}</div>
+            <div className="weather-pill">
+              {wx
+                ? `${wxIcon} ${wx.temp}°C ${wxDesc} · ${wx.wind} km/h · ${wx.rainProb}% rain`
+                : wxErr
+                  ? '⚠️ Weather unavailable'
+                  : 'Loading weather…'}
+            </div>
+            <button className="refresh-btn" onClick={refresh} disabled={loading}>
+              {loading ? '…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {stormy && (
+            <div className="alert storm">⛈️ Storm warning — take care travelling today.</div>
+          )}
+          {rainy && !stormy && (
+            <div className="alert rain">🌧️ Rain expected this morning — umbrellas for everyone.</div>
+          )}
+
+          <div className="section-label">Line Status</div>
+          <div className="line-grid">
+            <LineCard name="Northern line"  users="Boys · Emma · Carl"  data={tube.northern}  err={tubeErr} />
+            <LineCard name="Victoria line"  users="Carl (2nd leg)"       data={tube.victoria}  err={tubeErr} />
+            <LineCard name="Elizabeth line" users="Backup to Moorgate"   data={tube.elizabeth} err={tubeErr} />
+          </div>
+
+          <div className="dep-grid">
+            <TrainsPanel trains={trains} err={trainsErr} />
+            <BusPanel    buses={buses}   err={busErr}    />
+          </div>
+
+          <div className="section-label">This Morning</div>
+          <div className="advice-stack">
+            <AdviceCard
+              icon="🎒" name="The boys"
+              route="Northern → SWR → East Croydon"
+              advice={bAdv} leave={bAdv.leave}
+            />
+            <AdviceCard
+              icon="🚌" name="Orla"
+              route="Bus 50 from Abbeville Road"
+              advice={oAdv} leave="07:30"
+            />
+            <AdviceCard
+              icon="🚇" name="Carl"
+              route="Northern → Victoria to Oxford Circus"
+              advice={cAdv}
+            />
+            <AdviceCard
+              icon="📍" name="Emma"
+              route="Northern to Moorgate"
+              advice={eAdv}
+            />
+          </div>
+
+          {updated && (
+            <div className="footer">Updated {updated.toTimeString().slice(0, 5)}</div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
