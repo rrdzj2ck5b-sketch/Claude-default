@@ -443,10 +443,13 @@
           'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
           '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
           '&darwin=false&train_status=passenger&destination=ECR';
-        const url = 'https://corsproxy.io/?' + encodeURIComponent(base);
+        const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
         const r = await fetch(url);
-        if (!r.ok) throw new Error(`Trains HTTP ${r.status}`);
-        const data = await r.json();
+        if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+        const wrapper = await r.json();
+        if (wrapper.status?.http_code && wrapper.status.http_code !== 200)
+          throw new Error(`Trains HTTP ${wrapper.status.http_code}`);
+        const data = JSON.parse(wrapper.contents);
 
         const now    = new Date();
         const cutoff = new Date(now.getTime() - 2 * 60 * 1000);
