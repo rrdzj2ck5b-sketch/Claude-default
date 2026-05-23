@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Morning Planner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      padding: 16px 12px 40px;
+      min-height: 100vh;
+      color: #1a1a2e;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    .app-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+      color: #bbb; text-transform: uppercase; margin-bottom: 8px;
+    }
+
+    .header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+
+    .clock {
+      font-size: 34px; font-weight: 700;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.02em; flex-shrink: 0;
+    }
+
+    .weather-pill {
+      flex: 1; background: white; border-radius: 24px; padding: 9px 16px;
+      font-size: 14px; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .refresh-btn {
+      background: white; border: none; border-radius: 24px; padding: 9px 18px;
+      cursor: pointer; font-size: 14px; font-weight: 500; color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); flex-shrink: 0; -webkit-appearance: none;
+    }
+    .refresh-btn:disabled { opacity: 0.45; }
+
+    .alert {
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+      font-size: 14px; font-weight: 500;
+    }
+    .alert.rain  { background: #ebf8ff; border: 1px solid #90cdf4; color: #1a5276; }
+    .alert.storm { background: #fff5f5; border: 1px solid #fc8181; color: #7b341e; }
+
+    .section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+      color: #bbb; text-transform: uppercase; margin-bottom: 8px; margin-top: 2px;
+    }
+
+    .line-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;
+    }
+    @media (max-width: 420px) { .line-grid { grid-template-columns: 1fr; } }
+
+    .line-card {
+      background: white; border-radius: 10px; padding: 12px 12px 11px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-left: 4px solid #e2e8f0;
+    }
+    .line-card.good { border-left-color: #38a169; }
+    .line-card.warn { border-left-color: #d69e2e; }
+    .line-card.bad  { border-left-color: #e53e3e; }
+
+    .line-name  { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .line-users { font-size: 11px; color: #aaa; margin-bottom: 8px; }
+    .status-row { display: flex; align-items: center; gap: 6px; }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #ddd; }
+    .dot.good { background: #38a169; }
+    .dot.warn { background: #d69e2e; }
+    .dot.bad  { background: #e53e3e; }
+
+    .status-text { font-size: 12px; font-weight: 600; line-height: 1.2; }
+
+    .reason-text {
+      font-size: 11px; color: #e53e3e; margin-top: 5px; line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    .dep-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+    }
+    @media (max-width: 480px) { .dep-grid { grid-template-columns: 1fr; } }
+
+    .panel {
+      background: white; border-radius: 10px; padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .panel-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      color: #ccc; text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    .dep-row {
+      display: flex; align-items: baseline; gap: 6px;
+      padding: 5px 0; border-bottom: 1px solid #f7f7f5; font-size: 13px;
+    }
+    .dep-row:last-child { border-bottom: none; }
+    .dep-row.target { background: #fffbea; margin: 0 -14px; padding: 5px 14px; font-weight: 700; }
+
+    .dep-aimed  { font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 40px; }
+    .dep-star   { color: #d69e2e; flex-shrink: 0; }
+    .dep-dest   { flex: 1; color: #666; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dep-status { flex-shrink: 0; font-size: 12px; }
+    .dep-status.on-time   { color: #38a169; }
+    .dep-status.late      { color: #d69e2e; font-weight: 600; }
+    .dep-status.cancelled { color: #e53e3e; font-weight: 600; }
+
+    .bus-mins { flex-shrink: 0; font-size: 12px; color: #999; min-width: 52px; text-align: right; }
+
+    .error-msg { font-size: 13px; color: #e53e3e; line-height: 1.4; }
+    .empty-msg { font-size: 13px; color: #bbb; font-style: italic; }
+
+    .advice-stack { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+    .advice-card {
+      background: white; border-radius: 10px; padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      display: flex; align-items: center; gap: 14px;
+      border-left: 4px solid #e2e8f0;
+    }
+    .advice-card.good { border-left-color: #38a169; }
+    .advice-card.warn { border-left-color: #d69e2e; }
+    .advice-card.bad  { border-left-color: #e53e3e; }
+
+    .advice-icon  { font-size: 22px; flex-shrink: 0; }
+    .advice-body  { flex: 1; min-width: 0; }
+    .advice-name  { font-weight: 700; font-size: 14px; margin-bottom: 1px; }
+    .advice-route { font-size: 11px; color: #bbb; margin-bottom: 4px; }
+    .advice-msg   { font-size: 13px; color: #444; line-height: 1.45; }
+
+    .advice-leave {
+      font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em; color: #1a1a2e; flex-shrink: 0;
+    }
+
+    .footer { text-align: right; font-size: 11px; color: #ccc; padding-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="app-title">Morning Planner</div>
+
+  <div class="header">
+    <div class="clock" id="clock">--:--</div>
+    <div class="weather-pill" id="wx-pill">Loading weather…</div>
+    <button class="refresh-btn" id="refresh-btn">↻ Refresh</button>
+  </div>
+
+  <div id="wx-alert"></div>
+
+  <div class="section-label">Line Status</div>
+  <div class="line-grid">
+    <div id="line-northern" class="line-card">
+      <div class="line-name">Northern line</div>
+      <div class="line-users">Boys · Emma · Carl</div>
+      <div class="status-row"><span class="dot"></span><span class="status-text">Loading…</span></div>
+    </div>
+    <div id="line-victoria" class="line-card">
+      <div class="line-name">Victoria line</div>
+      <div class="line-users">Carl (2nd leg)</div>
+      <div class="status-row"><span class="dot"></span><span class="status-text">Loading…</span></div>
+    </div>
+    <div id="line-elizabeth" class="line-card">
+      <div class="line-name">Elizabeth line</div>
+      <div class="line-users">Backup to Moorgate</div>
+      <div class="status-row"><span class="dot"></span><span class="status-text">Loading…</span></div>
+    </div>
+  </div>
+
+  <div class="dep-grid">
+    <div class="panel">
+      <div class="panel-title">Balham → East Croydon</div>
+      <div id="trains-body"><div class="empty-msg">Loading…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Bus 50 · Abbeville Rd</div>
+      <div id="buses-body"><div class="empty-msg">Loading…</div></div>
+    </div>
+  </div>
+
+  <div class="section-label">This Morning</div>
+  <div class="advice-stack">
+    <div class="advice-card" id="advice-boys">
+      <div class="advice-icon">🎒</div>
+      <div class="advice-body">
+        <div class="advice-name">The boys</div>
+        <div class="advice-route">Northern → SWR → East Croydon</div>
+        <div class="advice-msg" id="boys-msg">Loading…</div>
+      </div>
+      <div class="advice-leave" id="boys-leave">07:20</div>
+    </div>
+    <div class="advice-card" id="advice-orla">
+      <div class="advice-icon">🚌</div>
+      <div class="advice-body">
+        <div class="advice-name">Orla</div>
+        <div class="advice-route">Bus 50 from Abbeville Road</div>
+        <div class="advice-msg" id="orla-msg">Loading…</div>
+      </div>
+      <div class="advice-leave">07:30</div>
+    </div>
+    <div class="advice-card" id="advice-carl">
+      <div class="advice-icon">🚇</div>
+      <div class="advice-body">
+        <div class="advice-name">Carl</div>
+        <div class="advice-route">Northern → Victoria to Oxford Circus</div>
+        <div class="advice-msg" id="carl-msg">Loading…</div>
+      </div>
+    </div>
+    <div class="advice-card" id="advice-emma">
+      <div class="advice-icon">📍</div>
+      <div class="advice-body">
+        <div class="advice-name">Emma</div>
+        <div class="advice-route">Northern to Moorgate</div>
+        <div class="advice-msg" id="emma-msg">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer"></div>
+
+</div>
+<script>
+  var state = {
+    tube: {}, tubeErr: null,
+    wx: null, wxErr: null,
+    trains: [], trainsErr: null,
+    buses: [], busErr: null,
+    updated: null
+  };
+
+  function parseHHMM(str) {
+    if (!str || str.indexOf(':') === -1) return null;
+    var parts = str.split(':');
+    var d = new Date();
+    d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+    return d;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  var WMO = {
+    0: ['☀️','Clear sky'], 1: ['🌤️','Mainly clear'],
+    2: ['⛅','Partly cloudy'], 3: ['☁️','Overcast'],
+    45: ['🌫️','Fog'], 48: ['🌫️','Fog']
+  };
+
+  function wmoLookup(code) {
+    if (WMO[code]) return WMO[code];
+    if (code >= 51 && code <= 55) return ['🌦️','Drizzle'];
+    if (code >= 61 && code <= 65) return ['🌧️','Rain'];
+    if (code >= 71 && code <= 75) return ['❄️','Snow'];
+    if (code >= 80 && code <= 82) return ['🌦️','Showers'];
+    if (code >= 95) return ['⛈️','Thunderstorm'];
+    return ['🌡️','Unknown'];
+  }
+
+  function isRainy(code)  { return code >= 51 && code <= 82; }
+  function isStormy(code) { return code >= 95; }
+
+  function sevCls(sev) {
+    if (sev == null) return '';
+    if (sev < 6) return 'bad';
+    if (sev < 10) return 'warn';
+    return 'good';
+  }
+
+  function boysAdvice() {
+    var n = state.tube.northern;
+    var wx = state.wx;
+    var target = null;
+    for (var i = 0; i < state.trains.length; i++) {
+      if (state.trains[i].isTarget) { target = state.trains[i]; break; }
+    }
+    var stormy = wx && isStormy(wx.code);
+    var rainy  = wx && (isRainy(wx.code) || wx.rainProb > 50);
+    var umb    = (rainy && !stormy) ? ' ☂️ Umbrellas for everyone.' : '';
+    if (stormy)
+      return {leave:'07:00', lvl:'bad',
+        msg:'⛈️ Stormy weather — leave at 07:00 to have margin for the 07:42.' + umb};
+    if (n && n.sev < 6)
+      return {leave:'07:05', lvl:'bad',
+        msg:'Severe Northern line disruption (' + n.desc + ') — leave at 07:05.' + umb};
+    if (n && n.sev < 10)
+      return {leave:'07:10', lvl:'warn',
+        msg:'Minor Northern line delays (' + n.desc + ') — leave at 07:10.' + umb};
+    if (target && target.cancelled)
+      return {leave:'07:15', lvl:'warn',
+        msg:'07:42 is cancelled — leave at 07:15 and check the next train.' + umb};
+    if (target && target.expected !== target.aimed)
+      return {leave:'07:20', lvl:'warn',
+        msg:'07:42 expected at ' + target.expected + ' — leave on time but allow margin.' + umb};
+    return {leave:'07:20', lvl:'good',
+      msg:'Northern line running well — leave for the 07:42 at normal time.' + umb};
+  }
+
+  function carlAdvice() {
+    var n = state.tube.northern;
+    var v = state.tube.victoria;
+    var wx = state.wx;
+    var rainy = wx && (isRainy(wx.code) || wx.rainProb > 50);
+    var umb  = rainy ? ' ☂️ Umbrella advised.' : '';
+    var nSev = (n && n.sev != null) ? n.sev : 10;
+    var vSev = (v && v.sev != null) ? v.sev : 10;
+    if (nSev < 6 && vSev < 6)
+      return {lvl:'bad', msg:'Both Northern and Victoria lines severely disrupted — expect significant delays.' + umb};
+    if (nSev < 6)
+      return {lvl:'warn', msg:'Severe Northern line issues (' + n.desc + ') — first leg may be slow. Victoria line fine.' + umb};
+    if (vSev < 6)
+      return {lvl:'warn', msg:'Victoria line severely disrupted (' + v.desc + ') — affects second leg to Oxford Circus.' + umb};
+    if (nSev < 10 || vSev < 10) {
+      var parts = [];
+      if (nSev < 10) parts.push('Northern');
+      if (vSev < 10) parts.push('Victoria');
+      return {lvl:'warn', msg:'Minor delays on ' + parts.join(' & ') + ' — allow extra time.' + umb};
+    }
+    return {lvl:'good', msg:'Both lines running well — no issues expected to Oxford Circus.' + umb};
+  }
+
+  function emmaAdvice() {
+    var n = state.tube.northern;
+    var wx = state.wx;
+    var rainy = wx && (isRainy(wx.code) || wx.rainProb > 50);
+    var umb = rainy ? ' ☂️ Umbrella needed.' : '';
+    var sev = (n && n.sev != null) ? n.sev : 10;
+    if (sev < 6)
+      return {lvl:'bad', msg:'Severe Northern line disruption — consider alternatives to Moorgate (bus or Overground).' + umb};
+    if (sev < 10)
+      return {lvl:'warn', msg:'Minor Northern line delays (' + n.desc + ') — leave a few minutes early.' + umb};
+    return {lvl:'good', msg:'Northern line running well — no issues to Moorgate.' + umb};
+  }
+
+  function orlaAdvice() {
+    var wx = state.wx;
+    var rainy = wx && (isRainy(wx.code) || wx.rainProb > 50);
+    var umb  = rainy ? ' ☂️ Umbrella needed.' : '';
+    if (state.busErr || state.buses.length === 0)
+      return {lvl:'warn', msg:(state.busErr || 'No bus data — check TfL for route 50.') + umb};
+    var next = state.buses[0];
+    if (next.mins <= 2)
+      return {lvl:'warn', msg:'Bus 50 in ' + next.mins + ' min' + (next.mins !== 1 ? 's' : '') + ' — leave now!' + umb};
+    var leaveAt = parseHHMM('07:30');
+    var arrival = parseHHMM(next.expected);
+    if (arrival && leaveAt && arrival <= leaveAt)
+      return {lvl:'good', msg:'Next bus at ' + next.expected + ' — fine for a 07:30 leave.' + umb};
+    var second = state.buses[1];
+    return {lvl:'warn', msg:'Next bus not until ' + next.expected + ' — may be tight for 07:30.' +
+      (second ? ' Check the ' + second.expected + ' bus.' : '') + umb};
+  }
+
+  function renderClock() {
+    document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 5);
+  }
+
+  function renderWeather() {
+    var wx = state.wx;
+    var pill  = document.getElementById('wx-pill');
+    var alert = document.getElementById('wx-alert');
+    if (!wx) {
+      pill.textContent = state.wxErr ? '⚠️ Weather unavailable' : 'Loading weather…';
+      alert.innerHTML = '';
+      return;
+    }
+    var wmo = wmoLookup(wx.code);
+    pill.textContent = wmo[0] + ' ' + wx.temp + '°C ' + wmo[1] + ' · ' + wx.wind + ' km/h · ' + wx.rainProb + '% rain';
+    if (isStormy(wx.code))
+      alert.innerHTML = '<div class="alert storm">⛈️ Storm warning — take care travelling today.</div>';
+    else if (isRainy(wx.code) || wx.rainProb > 50)
+      alert.innerHTML = '<div class="alert rain">🌧️ Rain expected this morning — umbrellas for everyone.</div>';
+    else
+      alert.innerHTML = '';
+  }
+
+  function renderLineCard(id, data, err) {
+    var card = document.getElementById(id);
+    var cls  = err ? 'bad' : sevCls(data && data.sev);
+    card.className = 'line-card' + (cls ? ' ' + cls : '');
+    card.querySelector('.dot').className = 'dot' + (cls ? ' ' + cls : '');
+    card.querySelector('.status-text').textContent =
+      err ? 'Data error' : (data ? data.desc : 'Loading…');
+    var existing = card.querySelector('.reason-text');
+    if (!err && data && data.reason) {
+      if (!existing) {
+        existing = document.createElement('div');
+        existing.className = 'reason-text';
+        card.appendChild(existing);
+      }
+      existing.textContent = data.reason;
+    } else if (existing) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function renderLines() {
+    var err = state.tubeErr;
+    renderLineCard('line-northern',  state.tube.northern,  err);
+    renderLineCard('line-victoria',  state.tube.victoria,  err);
+    renderLineCard('line-elizabeth', state.tube.elizabeth, err);
+  }
+
+  function renderTrains() {
+    var body = document.getElementById('trains-body');
+    if (state.trainsErr) {
+      body.innerHTML = '<div class="error-msg">⚠️ ' + esc(state.trainsErr) + '</div>';
+      return;
+    }
+    if (!state.trains.length) {
+      body.innerHTML = '<div class="empty-msg">No upcoming departures found.</div>';
+      return;
+    }
+    var out = '';
+    for (var i = 0; i < state.trains.length; i++) {
+      var t = state.trains[i];
+      var late    = !t.cancelled && t.expected !== t.aimed;
+      var statCls = t.cancelled ? 'cancelled' : (late ? 'late' : 'on-time');
+      var statTxt = t.cancelled ? 'Cancelled' : (late ? 'Exp ' + esc(t.expected) : 'On time');
+      out += '<div class="dep-row' + (t.isTarget ? ' target' : '') + '">';
+      out += '<span class="dep-aimed">' + esc(t.aimed) + '</span>';
+      if (t.isTarget) out += '<span class="dep-star">★</span>';
+      out += '<span class="dep-dest">' + esc(t.dest) + '</span>';
+      out += '<span class="dep-status ' + statCls + '">' + statTxt + '</span>';
+      out += '</div>';
+    }
+    body.innerHTML = out;
+  }
+
+  function renderBuses() {
+    var body = document.getElementById('buses-body');
+    if (state.busErr) {
+      body.innerHTML = '<div class="error-msg">⚠️ ' + esc(state.busErr) + '</div>';
+      return;
+    }
+    if (!state.buses.length) {
+      body.innerHTML = '<div class="empty-msg">No bus data available.</div>';
+      return;
+    }
+    var out = '';
+    for (var i = 0; i < state.buses.length; i++) {
+      var b = state.buses[i];
+      out += '<div class="dep-row">';
+      out += '<span class="dep-aimed">' + esc(b.expected) + '</span>';
+      out += '<span class="dep-dest">' + esc(b.dest) + '</span>';
+      out += '<span class="bus-mins">' + b.mins + ' min' + (b.mins !== 1 ? 's' : '') + '</span>';
+      out += '</div>';
+    }
+    body.innerHTML = out;
+  }
+
+  function renderAdvice() {
+    function apply(id, msgId, adv, leaveId) {
+      document.getElementById(id).className = 'advice-card ' + adv.lvl;
+      document.getElementById(msgId).textContent = adv.msg;
+      if (leaveId) document.getElementById(leaveId).textContent = adv.leave;
+    }
+    apply('advice-boys', 'boys-msg', boysAdvice(), 'boys-leave');
+    apply('advice-orla', 'orla-msg', orlaAdvice(), null);
+    apply('advice-carl', 'carl-msg', carlAdvice(), null);
+    apply('advice-emma', 'emma-msg', emmaAdvice(), null);
+  }
+
+  function renderAll() {
+    renderWeather();
+    renderLines();
+    renderTrains();
+    renderBuses();
+    renderAdvice();
+    if (state.updated)
+      document.getElementById('footer').textContent =
+        'Updated ' + state.updated.toTimeString().slice(0, 5);
+  }
+
+  function fetchTube() {
+    return fetch('https://api.tfl.gov.uk/Line/northern,victoria,elizabeth/Status')
+      .then(function(r) {
+        if (!r.ok) throw new Error('TfL HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var result = {};
+        for (var i = 0; i < data.length; i++) {
+          var line = data[i];
+          var s = (line.lineStatuses && line.lineStatuses[0]) || {};
+          result[line.id] = {
+            sev:    s.statusSeverity            != null ? s.statusSeverity            : 10,
+            desc:   s.statusSeverityDescription || '—',
+            reason: s.reason || null
+          };
+        }
+        state.tube = result;
+      })
+      .catch(function(e) { state.tubeErr = e.message; });
+  }
+
+  function fetchWeather() {
+    var url = 'https://api.open-meteo.com/v1/forecast' +
+      '?latitude=51.5074&longitude=-0.1278' +
+      '&current=temperature_2m,weathercode,windspeed_10m' +
+      '&hourly=precipitation_probability' +
+      '&timezone=Europe%2FLondon&forecast_days=1';
+    return fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('Weather HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var probs = (data.hourly && data.hourly.precipitation_probability) || [];
+        var slice = probs.slice(6, 10);
+        var rainProb = slice.length ? Math.max.apply(null, slice) : 0;
+        state.wx = {
+          temp:     Math.round(data.current.temperature_2m),
+          code:     data.current.weathercode,
+          wind:     Math.round(data.current.windspeed_10m),
+          rainProb: rainProb
+        };
+      })
+      .catch(function(e) { state.wxErr = e.message; });
+  }
+
+  function fetchTrains() {
+    var base = 'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
+      '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
+      '&darwin=false&train_status=passenger&destination=ECR';
+    var url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
+    return fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(wrapper) {
+        if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200)
+          throw new Error('Trains HTTP ' + wrapper.status.http_code);
+        var data = JSON.parse(wrapper.contents);
+        var now    = new Date();
+        var cutoff = new Date(now.getTime() - 2 * 60 * 1000);
+        var all    = (data.departures && data.departures.all) || [];
+        var deps   = [];
+        for (var i = 0; i < all.length; i++) {
+          var d = all[i];
+          if (!d.destination_name || d.destination_name.toLowerCase().indexOf('croydon') === -1) continue;
+          var t = parseHHMM(d.expected_departure_time || d.aimed_departure_time);
+          if (!t || t < cutoff) continue;
+          deps.push({
+            aimed:     d.aimed_departure_time || '—',
+            expected:  d.expected_departure_time || d.aimed_departure_time || '—',
+            dest:      d.destination_name || 'East Croydon',
+            cancelled: (d.status || '').toUpperCase().indexOf('CANCEL') !== -1,
+            isTarget:  d.aimed_departure_time === '07:42'
+          });
+          if (deps.length === 5) break;
+        }
+        state.trains = deps;
+      })
+      .catch(function(e) { state.trainsErr = e.message; });
+  }
+
+  function fetchBuses() {
+    return fetch('https://api.tfl.gov.uk/StopPoint/490004889E/Arrivals')
+      .then(function(r) {
+        if (!r.ok) throw new Error('Buses HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var route50 = [];
+        for (var i = 0; i < data.length; i++) {
+          if (data[i].lineName === '50') route50.push(data[i]);
+        }
+        route50.sort(function(a, b) { return a.timeToStation - b.timeToStation; });
+        route50 = route50.slice(0, 4);
+        if (route50.length === 0) {
+          var lineSet = {};
+          for (var i = 0; i < data.length; i++) lineSet[data[i].lineName] = true;
+          var lines = Object.keys(lineSet).sort().join(', ');
+          state.busErr = data.length
+            ? 'No route 50 found. Lines at this stop: ' + (lines || 'none')
+            : 'No buses currently showing at this stop.';
+        } else {
+          state.buses = route50.map(function(b) {
+            return {
+              mins:     Math.round(b.timeToStation / 60),
+              dest:     b.destinationName,
+              expected: new Date(b.expectedArrival).toTimeString().slice(0, 5)
+            };
+          });
+        }
+      })
+      .catch(function(e) { state.busErr = e.message; });
+  }
+
+  function refresh() {
+    var btn = document.getElementById('refresh-btn');
+    btn.textContent = '…';
+    btn.disabled = true;
+    state.tubeErr = null; state.wxErr = null;
+    state.trainsErr = null; state.busErr = null;
+    state.buses = []; state.trains = [];
+    Promise.all([fetchTube(), fetchWeather(), fetchTrains(), fetchBuses()])
+      .then(function() {
+        state.updated = new Date();
+        renderAll();
+        btn.textContent = '↻ Refresh';
+        btn.disabled = false;
+      });
+  }
+
+  document.getElementById('refresh-btn').addEventListener('click', refresh);
+  setInterval(renderClock, 1000);
+  renderClock();
+  refresh();
+</script>
+</body>
+</html>
