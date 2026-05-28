@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Period Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --flow-spotting: #ffd6e0;
+      --flow-light:    #ffadc6;
+      --flow-medium:   #f472a0;
+      --flow-heavy:    #c2185b;
+      --fertile:       #b2dfdb;
+      --fertile-text:  #00695c;
+      --predict:       #7c4dff;
+      --bg:            #fdf6f8;
+      --surface:       #ffffff;
+      --text:          #1a1a2e;
+      --muted:         #888;
+      --border:        #f0e6ea;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 64px;
+    }
+
+    /* ── bottom nav ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      display: flex; background: var(--surface);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -1px 6px rgba(0,0,0,0.06);
+    }
+    .nav-btn {
+      flex: 1; border: none; background: none; cursor: pointer;
+      padding: 10px 4px 8px; font-size: 11px; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      touch-action: manipulation; -webkit-appearance: none;
+    }
+    .nav-btn .icon { font-size: 20px; line-height: 1; }
+    .nav-btn.active { color: #c2185b; font-weight: 700; }
+    .nav-btn.active .icon { filter: none; }
+
+    /* ── sections ── */
+    .section { display: none; padding: 20px 16px 8px; max-width: 520px; margin: 0 auto; }
+    .section.active { display: block; }
+
+    .page-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+      color: #bbb; text-transform: uppercase; margin-bottom: 16px;
+    }
+
+    /* ── panels ── */
+    .panel {
+      background: var(--surface); border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      margin-bottom: 14px; overflow: hidden;
+    }
+    .panel-head {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      color: #ccc; text-transform: uppercase;
+      padding: 14px 16px 0;
+    }
+    .panel-body { padding: 12px 16px 14px; }
+
+    /* ── import screen ── */
+    .import-steps {
+      background: #fff8fa; border: 1px solid #fce4ec;
+      border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+      font-size: 13px; line-height: 1.7; color: #555;
+    }
+    .import-steps strong { color: var(--text); }
+    .import-steps ol { padding-left: 18px; margin-top: 6px; }
+
+    .file-drop {
+      border: 2px dashed #f48fb1; border-radius: 12px;
+      padding: 28px 20px; text-align: center; cursor: pointer;
+      background: var(--surface); margin-bottom: 14px;
+      transition: background 0.15s;
+    }
+    .file-drop:hover, .file-drop.drag-over { background: #fff0f5; }
+    .file-drop .drop-icon { font-size: 32px; margin-bottom: 8px; }
+    .file-drop .drop-label { font-size: 14px; font-weight: 600; color: #c2185b; margin-bottom: 4px; }
+    .file-drop .drop-hint  { font-size: 12px; color: var(--muted); }
+    #file-input { display: none; }
+
+    .import-result {
+      border-radius: 10px; padding: 12px 16px; font-size: 13px;
+      margin-bottom: 14px; display: none;
+    }
+    .import-result.success { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; }
+    .import-result.error   { background: #ffebee; border: 1px solid #ef9a9a; color: #b71c1c; }
+    .import-result .result-title { font-weight: 700; margin-bottom: 3px; }
+
+    .danger-btn {
+      background: none; border: 1px solid #e57373; border-radius: 8px;
+      color: #e53935; font-size: 13px; padding: 10px 18px; cursor: pointer;
+      touch-action: manipulation; -webkit-appearance: none;
+    }
+    .danger-btn:hover { background: #ffebee; }
+
+    /* ── calendar ── */
+    .cal-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .cal-nav button {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 14px;
+      touch-action: manipulation; -webkit-appearance: none;
+    }
+    .cal-month-label { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 3px; margin-bottom: 14px;
+    }
+    .cal-dow {
+      text-align: center; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.08em; color: #bbb; text-transform: uppercase;
+      padding: 4px 0 6px;
+    }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; cursor: pointer;
+      font-size: 13px; font-weight: 500; position: relative;
+      touch-action: manipulation; background: none; border: none;
+      min-height: 40px; color: var(--text);
+    }
+    .cal-day:hover { background: #fce4ec; }
+    .cal-day.empty { cursor: default; pointer-events: none; }
+    .cal-day.today { font-weight: 700; color: #c2185b; }
+    .cal-day.today::after {
+      content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px; border-radius: 50%; background: #c2185b;
+    }
+    .cal-day.flow-spotting { background: var(--flow-spotting); }
+    .cal-day.flow-light    { background: var(--flow-light); }
+    .cal-day.flow-medium   { background: var(--flow-medium); color: #fff; }
+    .cal-day.flow-heavy    { background: var(--flow-heavy); color: #fff; }
+    .cal-day.fertile       { background: var(--fertile); }
+    .cal-day.predict-start { outline: 2px solid var(--predict); outline-offset: -2px; border-radius: 8px; }
+    .cal-day.other-month   { opacity: 0.3; }
+
+    .predict-dot {
+      position: absolute; top: 3px; right: 3px;
+      width: 6px; height: 6px; border-radius: 50%; background: var(--predict);
+    }
+
+    .cal-legend {
+      display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin-bottom: 4px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; color: var(--muted); }
+    .legend-swatch {
+      width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+    }
+
+    /* ── log form ── */
+    .form-group { margin-bottom: 20px; }
+    .form-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      color: #aaa; text-transform: uppercase; margin-bottom: 8px; display: block;
+    }
+
+    .pill-group { display: flex; flex-wrap: wrap; gap: 7px; }
+    .pill {
+      border: 1.5px solid var(--border); border-radius: 20px;
+      padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer;
+      background: var(--surface); color: var(--text);
+      touch-action: manipulation; -webkit-appearance: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .pill.selected-flow-spotting { background: var(--flow-spotting); border-color: #f48fb1; }
+    .pill.selected-flow-light    { background: var(--flow-light);    border-color: #ec407a; }
+    .pill.selected-flow-medium   { background: var(--flow-medium);   border-color: var(--flow-medium); color: #fff; }
+    .pill.selected-flow-heavy    { background: var(--flow-heavy);    border-color: var(--flow-heavy);  color: #fff; }
+    .pill.selected-none          { background: #f5f5f5; border-color: #ccc; }
+    .pill.selected-cramps-1      { background: #fff3e0; border-color: #ffb74d; }
+    .pill.selected-cramps-2      { background: #ffe0b2; border-color: #ff9800; }
+    .pill.selected-cramps-3      { background: #ffccbc; border-color: #ff7043; color: #bf360c; }
+    .pill.selected-mood          { background: #e8eaf6; border-color: #7986cb; color: #283593; }
+
+    .date-input {
+      border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; font-size: 16px; width: 100%;
+      font-family: inherit; color: var(--text); background: var(--surface);
+      -webkit-appearance: none;
+    }
+    .date-input:focus { outline: 2px solid #f48fb1; outline-offset: 1px; border-color: transparent; }
+
+    .notes-input {
+      border: 1.5px solid var(--border); border-radius: 8px;
+      padding: 10px 12px; font-size: 16px; width: 100%; min-height: 80px;
+      font-family: inherit; color: var(--text); background: var(--surface);
+      resize: vertical; -webkit-appearance: none;
+    }
+    .notes-input:focus { outline: 2px solid #f48fb1; outline-offset: 1px; border-color: transparent; }
+
+    .save-btn {
+      width: 100%; background: #c2185b; color: white; border: none;
+      border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; -webkit-appearance: none;
+      margin-top: 4px;
+    }
+    .save-btn:hover { background: #ad1457; }
+    .save-btn:active { background: #880e4f; }
+
+    .saved-toast {
+      background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32;
+      border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 600;
+      text-align: center; margin-top: 10px; display: none;
+    }
+
+    /* ── stats ── */
+    .stat-row {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { flex: 1; color: var(--muted); }
+    .stat-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .predict-card {
+      background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+      border-radius: 12px; padding: 18px 18px 16px; margin-bottom: 14px;
+    }
+    .predict-card .predict-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+      color: #ad1457; text-transform: uppercase; margin-bottom: 10px;
+    }
+    .predict-next {
+      font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+      color: #880e4f; margin-bottom: 4px;
+    }
+    .predict-sub { font-size: 13px; color: #c2185b; }
+    .predict-detail {
+      display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .predict-detail-item { font-size: 12px; color: #ad1457; }
+    .predict-detail-item strong { font-weight: 700; display: block; font-size: 14px; color: #880e4f; }
+
+    .cycle-row {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .cycle-row:last-child { border-bottom: none; }
+    .cycle-date  { font-variant-numeric: tabular-nums; min-width: 90px; }
+    .cycle-len   { font-weight: 700; min-width: 48px; }
+    .cycle-bar   {
+      flex: 1; height: 6px; background: var(--border); border-radius: 3px;
+      overflow: hidden; align-self: center;
+    }
+    .cycle-bar-fill { height: 100%; background: #f48fb1; border-radius: 3px; }
+
+    .empty-state {
+      text-align: center; padding: 32px 16px; color: var(--muted);
+      font-size: 14px; line-height: 1.6;
+    }
+    .empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<!-- ── import ─────────────────────────────────────────────────────────────── -->
+<div id="section-import" class="section active">
+  <div class="page-title">Period Tracker</div>
+
+  <div class="import-steps">
+    <strong>How to import from Clue:</strong>
+    <ol>
+      <li>Open Clue &rarr; Settings &rarr; <em>Request data</em></li>
+      <li>Copy the password shown on screen</li>
+      <li>Check your email for the download link and save the ZIP</li>
+      <li>Unzip the file using the password (Files app or a computer)</li>
+      <li>Select <strong>measurements.json</strong> below</li>
+    </ol>
+  </div>
+
+  <div class="file-drop" id="file-drop">
+    <div class="drop-icon">📂</div>
+    <div class="drop-label">Tap to select measurements.json</div>
+    <div class="drop-hint">or drag and drop the file here</div>
+  </div>
+  <input type="file" id="file-input" accept=".json,.cluedata">
+
+  <div class="import-result" id="import-result">
+    <div class="result-title" id="import-result-title"></div>
+    <div id="import-result-body"></div>
+  </div>
+
+  <div class="panel" id="import-meta-panel" style="display:none">
+    <div class="panel-head">Last Import</div>
+    <div class="panel-body">
+      <div id="import-meta-text" style="font-size:13px;color:#555;"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:8px;">
+    <button class="danger-btn" id="clear-btn">Clear all data</button>
+  </div>
+</div>
+
+<!-- ── calendar ───────────────────────────────────────────────────────────── -->
+<div id="section-calendar" class="section">
+  <div class="cal-nav">
+    <button id="cal-prev">&#8592;</button>
+    <span class="cal-month-label" id="cal-label"></span>
+    <button id="cal-next">&#8594;</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--flow-spotting)"></div>Spotting</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--flow-light)"></div>Light</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--flow-medium)"></div>Medium</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--flow-heavy)"></div>Heavy</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--fertile)"></div>Fertile window</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:none;outline:2px solid var(--predict);border-radius:3px;"></div>Next period</div>
+  </div>
+</div>
+
+<!-- ── log ────────────────────────────────────────────────────────────────── -->
+<div id="section-log" class="section">
+  <div class="page-title">Log Day</div>
+
+  <div class="panel">
+    <div class="panel-body">
+
+      <div class="form-group">
+        <label class="form-label" for="log-date">Date</label>
+        <input type="date" id="log-date" class="date-input">
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">Flow</div>
+        <div class="pill-group" id="flow-pills">
+          <button class="pill" data-flow="none">None</button>
+          <button class="pill" data-flow="spotting">Spotting</button>
+          <button class="pill" data-flow="light">Light</button>
+          <button class="pill" data-flow="medium">Medium</button>
+          <button class="pill" data-flow="heavy">Heavy</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">Cramps</div>
+        <div class="pill-group" id="cramp-pills">
+          <button class="pill" data-cramps="0">None</button>
+          <button class="pill" data-cramps="1">Mild</button>
+          <button class="pill" data-cramps="2">Moderate</button>
+          <button class="pill" data-cramps="3">Severe</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">Mood</div>
+        <div class="pill-group" id="mood-pills">
+          <button class="pill" data-mood="happy">Happy</button>
+          <button class="pill" data-mood="low">Low</button>
+          <button class="pill" data-mood="anxious">Anxious</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="log-notes">Notes</label>
+        <textarea id="log-notes" class="notes-input" placeholder="Optional notes…"></textarea>
+      </div>
+
+      <button class="save-btn" id="save-btn">Save</button>
+      <div class="saved-toast" id="saved-toast">Saved!</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── stats ──────────────────────────────────────────────────────────────── -->
+<div id="section-stats" class="section">
+  <div class="page-title">Stats &amp; Predictions</div>
+  <div id="stats-body"></div>
+</div>
+
+<!-- ── bottom nav ─────────────────────────────────────────────────────────── -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-view="import">
+    <span class="icon">📥</span>Import
+  </button>
+  <button class="nav-btn" data-view="calendar">
+    <span class="icon">📅</span>Calendar
+  </button>
+  <button class="nav-btn" data-view="log">
+    <span class="icon">✏️</span>Log
+  </button>
+  <button class="nav-btn" data-view="stats">
+    <span class="icon">📊</span>Stats
+  </button>
+</nav>
+
+<script>
+  // ── state ─────────────────────────────────────────────────────────────────
+  var PT = {
+    days: {},     // keyed by "YYYY-MM-DD"
+    meta: {},
+    view: 'import',
+    calYear: new Date().getFullYear(),
+    calMonth: new Date().getMonth(),
+    logDate: todayStr(),
+    logFlow: null,   // null | "none" | "spotting" | "light" | "medium" | "heavy"
+    logCramps: null, // null | 0 | 1 | 2 | 3
+    logMoods: []     // array of selected moods
+  };
+
+  // ── date utilities (UTC-safe) ─────────────────────────────────────────────
+
+  function todayStr() {
+    var d = new Date();
+    return fmtDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+
+  function fmtDate(y, m, d) {
+    return y + '-' + pad(m) + '-' + pad(d);
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function parseDate(s) {
+    var p = s.split('-');
+    return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+  }
+
+  function addDays(dateStr, n) {
+    var d = parseDate(dateStr);
+    d.setUTCDate(d.getUTCDate() + n);
+    return fmtDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+
+  function daysBetween(aStr, bStr) {
+    var a = parseDate(aStr);
+    var b = parseDate(bStr);
+    return Math.round((b - a) / 86400000);
+  }
+
+  function formatDateDisplay(dateStr) {
+    var d = parseDate(dateStr);
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return days[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + months[d.getUTCMonth()];
+  }
+
+  function formatDateLong(dateStr) {
+    var d = parseDate(dateStr);
+    var months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+    return d.getUTCDate() + ' ' + months[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+  }
+
+  function monthLabel(year, month) {
+    var months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+    return months[month] + ' ' + year;
+  }
+
+  // ── localStorage ──────────────────────────────────────────────────────────
+
+  function loadState() {
+    try {
+      var d = localStorage.getItem('pt_days');
+      var m = localStorage.getItem('pt_meta');
+      PT.days = d ? JSON.parse(d) : {};
+      PT.meta = m ? JSON.parse(m) : {};
+    } catch(e) {
+      PT.days = {}; PT.meta = {};
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem('pt_days', JSON.stringify(PT.days));
+      localStorage.setItem('pt_meta', JSON.stringify(PT.meta));
+    } catch(e) {}
+  }
+
+  function getDay(dateStr) {
+    return PT.days[dateStr] || null;
+  }
+
+  function setDay(dateStr, fields) {
+    var existing = PT.days[dateStr] || { flow: null, cramps: null, mood: [], notes: '', source: 'manual' };
+    PT.days[dateStr] = Object.assign({}, existing, fields);
+    saveState();
+  }
+
+  // ── HTML escape ───────────────────────────────────────────────────────────
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Clue import ───────────────────────────────────────────────────────────
+
+  var MOOD_MAP = {
+    happy: 'happy', energized: 'happy', frisky: 'happy', excited: 'happy',
+    good: 'happy', positive: 'happy', calm: 'happy',
+    sad: 'low', sensitive: 'low', low: 'low', pms: 'low',
+    down: 'low', depressed: 'low',
+    anxious: 'anxious', irritable: 'anxious', mood_swings: 'anxious',
+    angry: 'anxious', stressed: 'anxious', confused: 'anxious'
+  };
+
+  function parseClueFile(text) {
+    var raw = JSON.parse(text);
+    var entries = [];
+
+    if (Array.isArray(raw)) {
+      // shape A: array of day objects each with a measurements array
+      // OR shape B: flat array of measurement objects with date field
+      if (raw.length > 0 && raw[0].measurements) {
+        // shape A
+        for (var i = 0; i < raw.length; i++) {
+          var dayObj = raw[i];
+          var date = normalizeDate(dayObj.date);
+          if (!date) continue;
+          var ms = dayObj.measurements || [];
+          for (var j = 0; j < ms.length; j++) {
+            entries.push({ date: date, type: ms[j].type, value: ms[j].value });
+          }
+        }
+      } else {
+        // shape B: flat array
+        for (var i = 0; i < raw.length; i++) {
+          var e = raw[i];
+          var date = normalizeDate(e.date);
+          if (!date) continue;
+          entries.push({ date: date, type: e.type, value: e.value });
+        }
+      }
+    } else if (raw.measurements && Array.isArray(raw.measurements)) {
+      // shape C: { measurements: [...] }
+      for (var i = 0; i < raw.measurements.length; i++) {
+        var e = raw.measurements[i];
+        var date = normalizeDate(e.date);
+        if (!date) continue;
+        entries.push({ date: date, type: e.type, value: e.value });
+      }
+    } else {
+      throw new Error('Unrecognised file format. Expected a measurements.json from Clue.');
+    }
+
+    if (entries.length === 0) {
+      throw new Error('No data entries found in this file.');
+    }
+
+    var dayMap = {};
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!dayMap[e.date]) {
+        dayMap[e.date] = { flow: null, cramps: null, mood: [], notes: '', source: 'clue' };
+      }
+      var rec = dayMap[e.date];
+      var type = (e.type || '').toLowerCase();
+      var val  = String(e.value || '').toLowerCase();
+
+      if (type === 'period' || type === 'menstruation') {
+        if (val === 'spotting' || val === 'light' || val === 'medium' || val === 'heavy') {
+          rec.flow = val;
+        } else if (val === 'medium-heavy' || val === 'heavy-medium') {
+          rec.flow = 'heavy';
+        }
+      } else if (type === 'cramps') {
+        if (val === 'mild')     rec.cramps = 1;
+        else if (val === 'medium' || val === 'moderate') rec.cramps = 2;
+        else if (val === 'severe' || val === 'strong')   rec.cramps = 3;
+        else rec.cramps = 1;
+      } else if (type === 'pain') {
+        if (val.indexOf('cramp') !== -1 && rec.cramps == null) rec.cramps = 1;
+      } else if (type === 'mood') {
+        var mapped = MOOD_MAP[val];
+        if (mapped && rec.mood.indexOf(mapped) === -1) rec.mood.push(mapped);
+      } else if (type === 'note' || type === 'notes') {
+        if (e.value) rec.notes = String(e.value);
+      }
+    }
+
+    // merge into PT.days; manual entries take priority
+    var imported = 0;
+    var minDate = null, maxDate = null;
+    var dates = Object.keys(dayMap);
+    for (var i = 0; i < dates.length; i++) {
+      var d = dates[i];
+      if (!PT.days[d] || PT.days[d].source === 'clue') {
+        PT.days[d] = dayMap[d];
+        imported++;
+      }
+      if (!minDate || d < minDate) minDate = d;
+      if (!maxDate || d > maxDate) maxDate = d;
+    }
+
+    PT.meta.importedAt = new Date().toISOString();
+    saveState();
+
+    return {
+      total: imported,
+      minDate: minDate,
+      maxDate: maxDate
+    };
+  }
+
+  function normalizeDate(s) {
+    if (!s) return null;
+    s = String(s).trim();
+    // already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    // try DD/MM/YYYY
+    var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) return m[3] + '-' + m[2] + '-' + m[1];
+    return null;
+  }
+
+  // ── cycle maths ───────────────────────────────────────────────────────────
+
+  function computeCycleStarts() {
+    var flowDates = [];
+    var keys = Object.keys(PT.days);
+    for (var i = 0; i < keys.length; i++) {
+      var d = PT.days[keys[i]];
+      if (d.flow && d.flow !== 'none') flowDates.push(keys[i]);
+    }
+    flowDates.sort();
+    if (flowDates.length === 0) return [];
+
+    var starts = [flowDates[0]];
+    for (var i = 1; i < flowDates.length; i++) {
+      if (daysBetween(flowDates[i-1], flowDates[i]) >= 3) {
+        starts.push(flowDates[i]);
+      }
+    }
+    return starts;
+  }
+
+  function predictNextCycle() {
+    var starts = computeCycleStarts();
+    if (starts.length < 2) return null;
+
+    var lengths = [];
+    for (var i = 1; i < starts.length; i++) {
+      var l = daysBetween(starts[i-1], starts[i]);
+      if (l >= 15 && l <= 45) lengths.push(l);
+    }
+    var avgLength = 28;
+    if (lengths.length > 0) {
+      var sum = 0;
+      for (var i = 0; i < lengths.length; i++) sum += lengths[i];
+      avgLength = Math.round(sum / lengths.length);
+    }
+
+    var lastStart = starts[starts.length - 1];
+    var nextStart    = addDays(lastStart, avgLength);
+    var ovulation    = addDays(lastStart, avgLength - 14);
+    var fertileStart = addDays(ovulation, -4);
+    var fertileEnd   = addDays(ovulation, 1);
+    var today        = todayStr();
+    var cycleDay     = Math.max(1, daysBetween(lastStart, today) + 1);
+
+    return {
+      avgLength:    avgLength,
+      lastStart:    lastStart,
+      nextStart:    nextStart,
+      fertileStart: fertileStart,
+      fertileEnd:   fertileEnd,
+      cycleDay:     cycleDay,
+      starts:       starts,
+      lengths:      lengths
+    };
+  }
+
+  // ── navigation ────────────────────────────────────────────────────────────
+
+  function showView(v) {
+    PT.view = v;
+    var sections = document.querySelectorAll('.section');
+    for (var i = 0; i < sections.length; i++) {
+      sections[i].classList.remove('active');
+    }
+    document.getElementById('section-' + v).classList.add('active');
+    var btns = document.querySelectorAll('.nav-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].dataset.view === v);
+    }
+    renderView();
+  }
+
+  function renderView() {
+    if (PT.view === 'calendar') renderCalendar();
+    else if (PT.view === 'log')      renderLog();
+    else if (PT.view === 'stats')    renderStats();
+    else                             renderImport();
+  }
+
+  // ── import screen ─────────────────────────────────────────────────────────
+
+  function renderImport() {
+    var panel = document.getElementById('import-meta-panel');
+    var text  = document.getElementById('import-meta-text');
+    if (PT.meta.importedAt) {
+      panel.style.display = '';
+      var d = new Date(PT.meta.importedAt);
+      var starts = computeCycleStarts();
+      var days = Object.keys(PT.days).length;
+      text.innerHTML = 'Last import: <strong>' + esc(d.toLocaleDateString()) + '</strong><br>' +
+        days + ' days on record &bull; ' + starts.length + ' cycles detected';
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function showImportResult(type, title, body) {
+    var el = document.getElementById('import-result');
+    el.className = 'import-result ' + type;
+    el.style.display = '';
+    document.getElementById('import-result-title').textContent = title;
+    document.getElementById('import-result-body').textContent = body;
+  }
+
+  // ── calendar ──────────────────────────────────────────────────────────────
+
+  function renderCalendar() {
+    var year  = PT.calYear;
+    var month = PT.calMonth;
+    document.getElementById('cal-label').textContent = monthLabel(year, month);
+
+    var pred = predictNextCycle();
+    var fertileStart = pred ? pred.fertileStart : null;
+    var fertileEnd   = pred ? pred.fertileEnd   : null;
+    var nextStart    = pred ? pred.nextStart    : null;
+
+    var today = todayStr();
+    var firstDay = new Date(Date.UTC(year, month, 1));
+    var lastDay  = new Date(Date.UTC(year, month + 1, 0));
+
+    // Monday-first: 0=Mon … 6=Sun
+    var startDow = (firstDay.getUTCDay() + 6) % 7;
+    var totalDays = lastDay.getUTCDate();
+
+    var html = '';
+    // day-of-week headers
+    var dows = ['M','T','W','T','F','S','S'];
+    for (var i = 0; i < 7; i++) {
+      html += '<div class="cal-dow">' + dows[i] + '</div>';
+    }
+
+    // blank leading cells
+    for (var i = 0; i < startDow; i++) {
+      html += '<div class="cal-day empty"></div>';
+    }
+
+    for (var day = 1; day <= totalDays; day++) {
+      var dateStr = fmtDate(year, month + 1, day);
+      var rec = getDay(dateStr);
+      var classes = ['cal-day'];
+      var extra = '';
+
+      if (rec && rec.flow && rec.flow !== 'none') {
+        classes.push('flow-' + rec.flow);
+      } else if (fertileStart && fertileEnd && dateStr >= fertileStart && dateStr <= fertileEnd) {
+        classes.push('fertile');
+      }
+
+      if (nextStart && dateStr === nextStart) {
+        classes.push('predict-start');
+        extra = '<div class="predict-dot"></div>';
+      }
+
+      if (dateStr === today) classes.push('today');
+
+      html += '<button class="' + classes.join(' ') + '" data-date="' + dateStr + '">' +
+        day + extra + '</button>';
+    }
+
+    document.getElementById('cal-grid').innerHTML = html;
+
+    // click handlers
+    var cells = document.querySelectorAll('#cal-grid .cal-day[data-date]');
+    for (var i = 0; i < cells.length; i++) {
+      (function(cell) {
+        cell.addEventListener('click', function() {
+          PT.logDate = cell.dataset.date;
+          showView('log');
+        });
+      })(cells[i]);
+    }
+  }
+
+  // ── log form ──────────────────────────────────────────────────────────────
+
+  function renderLog() {
+    var dateInput = document.getElementById('log-date');
+    dateInput.value = PT.logDate;
+
+    var rec = getDay(PT.logDate) || {};
+    PT.logFlow   = rec.flow   != null ? rec.flow   : null;
+    PT.logCramps = rec.cramps != null ? rec.cramps : null;
+    PT.logMoods  = rec.mood ? rec.mood.slice() : [];
+
+    document.getElementById('log-notes').value = rec.notes || '';
+    document.getElementById('saved-toast').style.display = 'none';
+
+    updateFlowPills();
+    updateCrampPills();
+    updateMoodPills();
+  }
+
+  function updateFlowPills() {
+    var pills = document.querySelectorAll('#flow-pills .pill');
+    for (var i = 0; i < pills.length; i++) {
+      var p = pills[i];
+      var val = p.dataset.flow;
+      p.className = 'pill';
+      if (PT.logFlow === val || (PT.logFlow === null && val === null)) {
+        if (val === 'none') p.classList.add('selected-none');
+        else if (val) p.classList.add('selected-flow-' + val);
+      }
+    }
+  }
+
+  function updateCrampPills() {
+    var pills = document.querySelectorAll('#cramp-pills .pill');
+    for (var i = 0; i < pills.length; i++) {
+      var p = pills[i];
+      var val = parseInt(p.dataset.cramps, 10);
+      p.className = 'pill';
+      if (PT.logCramps === val) {
+        if (val === 0) p.classList.add('selected-none');
+        else p.classList.add('selected-cramps-' + val);
+      }
+    }
+  }
+
+  function updateMoodPills() {
+    var pills = document.querySelectorAll('#mood-pills .pill');
+    for (var i = 0; i < pills.length; i++) {
+      var p = pills[i];
+      p.className = 'pill';
+      if (PT.logMoods.indexOf(p.dataset.mood) !== -1) {
+        p.classList.add('selected-mood');
+      }
+    }
+  }
+
+  // ── stats ─────────────────────────────────────────────────────────────────
+
+  function renderStats() {
+    var pred = predictNextCycle();
+    var body = document.getElementById('stats-body');
+
+    if (!pred) {
+      body.innerHTML = '<div class="empty-state">' +
+        '<div class="empty-icon">📊</div>' +
+        'Not enough data yet.<br>Import your Clue history or log at least two periods to see predictions.' +
+        '</div>';
+      return;
+    }
+
+    var html = '';
+
+    // prediction card
+    html += '<div class="predict-card">';
+    html += '<div class="predict-title">Next Period</div>';
+    html += '<div class="predict-next">' + esc(formatDateDisplay(pred.nextStart)) + '</div>';
+    html += '<div class="predict-sub">Cycle day ' + pred.cycleDay + ' of ~' + pred.avgLength + '</div>';
+    html += '<div class="predict-detail">';
+    html += '<div class="predict-detail-item"><strong>' + esc(formatDateDisplay(pred.fertileStart)) + ' – ' + esc(formatDateDisplay(pred.fertileEnd)) + '</strong>Fertile window</div>';
+    html += '<div class="predict-detail-item"><strong>~' + pred.avgLength + ' days</strong>Avg cycle</div>';
+    html += '</div></div>';
+
+    // cycle summary
+    html += '<div class="panel"><div class="panel-head">Cycle Summary</div><div class="panel-body">';
+    if (pred.lengths.length > 0) {
+      var min = pred.lengths[0], max = pred.lengths[0];
+      for (var i = 1; i < pred.lengths.length; i++) {
+        if (pred.lengths[i] < min) min = pred.lengths[i];
+        if (pred.lengths[i] > max) max = pred.lengths[i];
+      }
+      html += '<div class="stat-row"><span class="stat-label">Average cycle</span><span class="stat-value">' + pred.avgLength + ' days</span></div>';
+      html += '<div class="stat-row"><span class="stat-label">Shortest cycle</span><span class="stat-value">' + min + ' days</span></div>';
+      html += '<div class="stat-row"><span class="stat-label">Longest cycle</span><span class="stat-value">' + max + ' days</span></div>';
+      html += '<div class="stat-row"><span class="stat-label">Cycles tracked</span><span class="stat-value">' + pred.starts.length + '</span></div>';
+    }
+    html += '</div></div>';
+
+    // cycle history
+    html += '<div class="panel"><div class="panel-head">Cycle History</div><div class="panel-body">';
+    var maxLen = pred.avgLength > 0 ? pred.avgLength * 1.5 : 40;
+    for (var i = pred.starts.length - 1; i >= 0; i--) {
+      var len = pred.lengths[i - 1];
+      html += '<div class="cycle-row">';
+      html += '<span class="cycle-date">' + esc(formatDateLong(pred.starts[i])) + '</span>';
+      if (len != null) {
+        var pct = Math.min(100, Math.round(len / maxLen * 100));
+        html += '<span class="cycle-len">' + len + 'd</span>';
+        html += '<div class="cycle-bar"><div class="cycle-bar-fill" style="width:' + pct + '%"></div></div>';
+      } else {
+        html += '<span class="cycle-len" style="color:#bbb">—</span>';
+        html += '<div class="cycle-bar"></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+
+    body.innerHTML = html;
+  }
+
+  // ── event wiring ──────────────────────────────────────────────────────────
+
+  // nav tabs
+  var navBtns = document.querySelectorAll('.nav-btn');
+  for (var i = 0; i < navBtns.length; i++) {
+    (function(btn) {
+      btn.addEventListener('click', function() { showView(btn.dataset.view); });
+    })(navBtns[i]);
+  }
+
+  // calendar prev/next
+  document.getElementById('cal-prev').addEventListener('click', function() {
+    PT.calMonth--;
+    if (PT.calMonth < 0) { PT.calMonth = 11; PT.calYear--; }
+    renderCalendar();
+  });
+  document.getElementById('cal-next').addEventListener('click', function() {
+    PT.calMonth++;
+    if (PT.calMonth > 11) { PT.calMonth = 0; PT.calYear++; }
+    renderCalendar();
+  });
+
+  // file drop zone
+  var dropZone = document.getElementById('file-drop');
+  var fileInput = document.getElementById('file-input');
+
+  dropZone.addEventListener('click', function() { fileInput.click(); });
+
+  dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    var file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    fileInput.value = '';
+  });
+
+  function handleFile(file) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var summary = parseClueFile(ev.target.result);
+        showImportResult('success',
+          'Import successful',
+          summary.total + ' days imported' +
+          (summary.minDate && summary.maxDate
+            ? ' (' + formatDateLong(summary.minDate) + ' – ' + formatDateLong(summary.maxDate) + ')'
+            : '') + '.'
+        );
+        renderImport();
+      } catch(err) {
+        showImportResult('error', 'Import failed', err.message);
+      }
+    };
+    reader.onerror = function() {
+      showImportResult('error', 'Could not read file', 'Please try again.');
+    };
+    reader.readAsText(file);
+  }
+
+  // clear data
+  document.getElementById('clear-btn').addEventListener('click', function() {
+    if (!confirm('Delete all tracked data? This cannot be undone.')) return;
+    PT.days = {};
+    PT.meta = {};
+    saveState();
+    document.getElementById('import-result').style.display = 'none';
+    renderImport();
+  });
+
+  // date input change
+  document.getElementById('log-date').addEventListener('change', function() {
+    PT.logDate = this.value;
+    renderLog();
+  });
+
+  // flow pills
+  var flowPills = document.querySelectorAll('#flow-pills .pill');
+  for (var i = 0; i < flowPills.length; i++) {
+    (function(pill) {
+      pill.addEventListener('click', function() {
+        var val = pill.dataset.flow;
+        PT.logFlow = (PT.logFlow === val) ? null : val;
+        updateFlowPills();
+      });
+    })(flowPills[i]);
+  }
+
+  // cramp pills
+  var crampPills = document.querySelectorAll('#cramp-pills .pill');
+  for (var i = 0; i < crampPills.length; i++) {
+    (function(pill) {
+      pill.addEventListener('click', function() {
+        var val = parseInt(pill.dataset.cramps, 10);
+        PT.logCramps = (PT.logCramps === val) ? null : val;
+        updateCrampPills();
+      });
+    })(crampPills[i]);
+  }
+
+  // mood pills (multi-select)
+  var moodPills = document.querySelectorAll('#mood-pills .pill');
+  for (var i = 0; i < moodPills.length; i++) {
+    (function(pill) {
+      pill.addEventListener('click', function() {
+        var val = pill.dataset.mood;
+        var idx = PT.logMoods.indexOf(val);
+        if (idx === -1) PT.logMoods.push(val);
+        else PT.logMoods.splice(idx, 1);
+        updateMoodPills();
+      });
+    })(moodPills[i]);
+  }
+
+  // save button
+  document.getElementById('save-btn').addEventListener('click', function() {
+    var dateVal = document.getElementById('log-date').value;
+    if (!dateVal) return;
+    PT.logDate = dateVal;
+
+    setDay(PT.logDate, {
+      flow:   PT.logFlow === 'none' ? null : PT.logFlow,
+      cramps: PT.logCramps,
+      mood:   PT.logMoods.slice(),
+      notes:  document.getElementById('log-notes').value.trim(),
+      source: 'manual'
+    });
+
+    var toast = document.getElementById('saved-toast');
+    toast.style.display = '';
+    setTimeout(function() { toast.style.display = 'none'; }, 2000);
+  });
+
+  // ── init ──────────────────────────────────────────────────────────────────
+
+  loadState();
+
+  // default date input to today
+  document.getElementById('log-date').value = PT.logDate;
+
+  // if data already exists, open calendar instead of import
+  if (Object.keys(PT.days).length > 0) {
+    showView('calendar');
+  } else {
+    renderImport();
+  }
+</script>
+</body>
+</html>
