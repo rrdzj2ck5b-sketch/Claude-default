@@ -673,11 +673,14 @@
     var starts = computeCycleStarts();
     if (starts.length < 2) return null;
 
-    var lengths = [];
-    for (var i = 1; i < starts.length; i++) {
-      var l = daysBetween(starts[i-1], starts[i]);
+    var lengths = [];    // filtered, used for average
+    var allLengths = []; // one per start: allLengths[i] = days from starts[i] to starts[i+1]
+    for (var i = 0; i < starts.length - 1; i++) {
+      var l = daysBetween(starts[i], starts[i + 1]);
+      allLengths.push(l);
       if (l >= 15 && l <= 45) lengths.push(l);
     }
+    allLengths.push(null); // last cycle has no end yet
     var avgLength = 28;
     if (lengths.length > 0) {
       var sum = 0;
@@ -701,7 +704,8 @@
       fertileEnd:   fertileEnd,
       cycleDay:     cycleDay,
       starts:       starts,
-      lengths:      lengths
+      lengths:      lengths,
+      allLengths:   allLengths
     };
   }
 
@@ -923,7 +927,7 @@
     html += '<div class="panel"><div class="panel-head">Cycle History</div><div class="panel-body">';
     var maxLen = pred.avgLength > 0 ? pred.avgLength * 1.5 : 40;
     for (var i = pred.starts.length - 1; i >= 0; i--) {
-      var len = pred.lengths[i - 1];
+      var len = pred.allLengths[i];
       html += '<div class="cycle-row">';
       html += '<span class="cycle-date">' + esc(formatDateLong(pred.starts[i])) + '</span>';
       if (len != null) {
