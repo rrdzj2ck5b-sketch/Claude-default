@@ -52,7 +52,6 @@
 
     /* ── sections ── */
     .section { display: none; padding: 20px 16px 8px; max-width: 520px; margin: 0 auto; }
-    .section.active { display: block; }
 
     .page-title {
       font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
@@ -271,7 +270,7 @@
 <body>
 
 <!-- ── import ─────────────────────────────────────────────────────────────── -->
-<div id="section-import" class="section active">
+<div id="section-import" class="section">
   <div class="page-title">Period Tracker</div>
 
   <div class="import-steps">
@@ -392,16 +391,16 @@
 
 <!-- ── bottom nav ─────────────────────────────────────────────────────────── -->
 <nav class="bottom-nav">
-  <button class="nav-btn active" data-view="import">
+  <button type="button" class="nav-btn active" id="nav-import" onclick="showView('import')">
     <span class="icon">📥</span>Import
   </button>
-  <button class="nav-btn" data-view="calendar">
+  <button type="button" class="nav-btn" id="nav-calendar" onclick="showView('calendar')">
     <span class="icon">📅</span>Calendar
   </button>
-  <button class="nav-btn" data-view="log">
+  <button type="button" class="nav-btn" id="nav-log" onclick="showView('log')">
     <span class="icon">✏️</span>Log
   </button>
-  <button class="nav-btn" data-view="stats">
+  <button type="button" class="nav-btn" id="nav-stats" onclick="showView('stats')">
     <span class="icon">📊</span>Stats
   </button>
 </nav>
@@ -712,16 +711,14 @@
 
   // ── navigation ────────────────────────────────────────────────────────────
 
+  var VIEWS = ['import', 'calendar', 'log', 'stats'];
+
   function showView(v) {
     PT.view = v;
-    var sections = document.querySelectorAll('.section');
-    for (var i = 0; i < sections.length; i++) {
-      sections[i].classList.remove('active');
-    }
-    document.getElementById('section-' + v).classList.add('active');
-    var btns = document.querySelectorAll('.nav-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('active', btns[i].dataset.view === v);
+    for (var i = 0; i < VIEWS.length; i++) {
+      document.getElementById('section-' + VIEWS[i]).style.display = (VIEWS[i] === v) ? 'block' : 'none';
+      var btn = document.getElementById('nav-' + VIEWS[i]);
+      if (btn) btn.className = 'nav-btn' + (VIEWS[i] === v ? ' active' : '');
     }
     renderView();
   }
@@ -948,13 +945,7 @@
 
   // ── event wiring ──────────────────────────────────────────────────────────
 
-  // nav tabs
-  var navBtns = document.querySelectorAll('.nav-btn');
-  for (var i = 0; i < navBtns.length; i++) {
-    (function(btn) {
-      btn.addEventListener('click', function() { showView(btn.dataset.view); });
-    })(navBtns[i]);
-  }
+  // nav tabs handled via inline onclick on each button
 
   // calendar prev/next
   document.getElementById('cal-prev').addEventListener('click', function() {
@@ -1100,7 +1091,7 @@
   if (Object.keys(PT.days).length > 0) {
     showView('calendar');
   } else {
-    renderImport();
+    showView('import');
   }
 </script>
 </body>
