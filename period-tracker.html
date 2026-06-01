@@ -52,6 +52,7 @@
 
     /* ── sections ── */
     .section { display: none; padding: 20px 16px 8px; max-width: 520px; margin: 0 auto; }
+    .section.active { display: block; }
 
     .page-title {
       font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
@@ -270,7 +271,7 @@
 <body>
 
 <!-- ── import ─────────────────────────────────────────────────────────────── -->
-<div id="section-import" class="section">
+<div id="section-import" class="section active">
   <div class="page-title">Period Tracker</div>
 
   <div class="import-steps">
@@ -716,9 +717,13 @@
   function showView(v) {
     PT.view = v;
     for (var i = 0; i < VIEWS.length; i++) {
-      document.getElementById('section-' + VIEWS[i]).style.display = (VIEWS[i] === v) ? 'block' : 'none';
+      var sec = document.getElementById('section-' + VIEWS[i]);
+      var isActive = (VIEWS[i] === v);
+      sec.style.display = isActive ? 'block' : 'none';
+      if (isActive) sec.classList.add('active');
+      else sec.classList.remove('active');
       var btn = document.getElementById('nav-' + VIEWS[i]);
-      if (btn) btn.className = 'nav-btn' + (VIEWS[i] === v ? ' active' : '');
+      if (btn) btn.className = 'nav-btn' + (isActive ? ' active' : '');
     }
     renderView();
   }
