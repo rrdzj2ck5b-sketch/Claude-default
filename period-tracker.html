@@ -662,7 +662,7 @@
 
     var starts = [flowDates[0]];
     for (var i = 1; i < flowDates.length; i++) {
-      if (daysBetween(flowDates[i-1], flowDates[i]) >= 3) {
+      if (daysBetween(flowDates[i-1], flowDates[i]) > 10) {
         starts.push(flowDates[i]);
       }
     }
