@@ -571,10 +571,18 @@
       var type = (e.type || '').toLowerCase();
       var val  = String(e.value || '').toLowerCase();
 
-      if (type === 'period' || type === 'menstruation') {
+      if (type === 'period' || type === 'menstruation' || type === 'bleeding') {
         if (val === 'spotting' || val === 'light' || val === 'medium' || val === 'heavy') {
           rec.flow = val;
-        } else if (val === 'medium-heavy' || val === 'heavy-medium') {
+        } else if (val === 'medium-heavy' || val === 'heavy-medium' || val === 'medium_heavy') {
+          rec.flow = 'heavy';
+        } else if (val === 'light-medium' || val === 'light_medium') {
+          rec.flow = 'light';
+        } else if (val === '1') {
+          rec.flow = 'light';
+        } else if (val === '2') {
+          rec.flow = 'medium';
+        } else if (val === '3' || val === '4') {
           rec.flow = 'heavy';
         }
       } else if (type === 'cramps') {
@@ -609,8 +617,15 @@
     PT.meta.importedAt = new Date().toISOString();
     saveState();
 
+    var flowDays = 0;
+    var allDates = Object.keys(PT.days);
+    for (var i = 0; i < allDates.length; i++) {
+      if (PT.days[allDates[i]].flow) flowDays++;
+    }
+
     return {
       total: imported,
+      flowDays: flowDays,
       minDate: minDate,
       maxDate: maxDate
     };
@@ -977,7 +992,7 @@
           summary.total + ' days imported' +
           (summary.minDate && summary.maxDate
             ? ' (' + formatDateLong(summary.minDate) + ' – ' + formatDateLong(summary.maxDate) + ')'
-            : '') + '.'
+            : '') + '. ' + summary.flowDays + ' period days detected.'
         );
         renderImport();
       } catch(err) {
