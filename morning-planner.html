@@ -289,30 +289,27 @@
   function boysAdvice() {
     var n = state.tube.northern;
     var wx = state.wx;
-    var target = null;
-    for (var i = 0; i < state.trains.length; i++) {
-      if (state.trains[i].isTarget) { target = state.trains[i]; break; }
-    }
+    var next = state.trains[0];
     var stormy = wx && isStormy(wx.code);
     var rainy  = wx && (isRainy(wx.code) || wx.rainProb > 50);
     var umb    = (rainy && !stormy) ? ' ☂️ Umbrellas for everyone.' : '';
     if (stormy)
       return {leave:'07:00', lvl:'bad',
-        msg:'⛈️ Stormy weather — leave at 07:00 to have margin for the 07:42.' + umb};
+        msg:'⛈️ Stormy weather — leave at 07:00.' + umb};
     if (n && n.sev < 6)
       return {leave:'07:05', lvl:'bad',
         msg:'Severe Northern line disruption (' + n.desc + ') — leave at 07:05.' + umb};
     if (n && n.sev < 10)
       return {leave:'07:10', lvl:'warn',
         msg:'Minor Northern line delays (' + n.desc + ') — leave at 07:10.' + umb};
-    if (target && target.cancelled)
+    if (next && next.cancelled)
       return {leave:'07:15', lvl:'warn',
-        msg:'07:42 is cancelled — leave at 07:15 and check the next train.' + umb};
-    if (target && target.expected !== target.aimed)
+        msg:'Next SWR train cancelled — leave at 07:15 and check the following one.' + umb};
+    if (next && next.expected !== next.aimed)
       return {leave:'07:20', lvl:'warn',
-        msg:'07:42 expected at ' + target.expected + ' — leave on time but allow margin.' + umb};
+        msg:'Next SWR train expected at ' + next.expected + ' — allow some margin.' + umb};
     return {leave:'07:20', lvl:'good',
-      msg:'Northern line running well — leave for the 07:42 at normal time.' + umb};
+      msg:'Northern line running well — leave at normal time.' + umb};
   }
 
   function carlAdvice() {
@@ -437,9 +434,8 @@
       var late    = !t.cancelled && t.expected !== t.aimed;
       var statCls = t.cancelled ? 'cancelled' : (late ? 'late' : 'on-time');
       var statTxt = t.cancelled ? 'Cancelled' : (late ? 'Exp ' + esc(t.expected) : 'On time');
-      out += '<div class="dep-row' + (t.isTarget ? ' target' : '') + '">';
+      out += '<div class="dep-row">';
       out += '<span class="dep-aimed">' + esc(t.aimed) + '</span>';
-      if (t.isTarget) out += '<span class="dep-star">★</span>';
       out += '<span class="dep-dest">' + esc(t.dest) + '</span>';
       out += '<span class="dep-status ' + statCls + '">' + statTxt + '</span>';
       out += '</div>';
@@ -568,10 +564,9 @@
             aimed:     d.aimed_departure_time || '—',
             expected:  d.expected_departure_time || d.aimed_departure_time || '—',
             dest:      d.destination_name || 'East Croydon',
-            cancelled: (d.status || '').toUpperCase().indexOf('CANCEL') !== -1,
-            isTarget:  d.aimed_departure_time === '07:42'
+            cancelled: (d.status || '').toUpperCase().indexOf('CANCEL') !== -1
           });
-          if (deps.length === 5) break;
+          if (deps.length === 2) break;
         }
         state.trains = deps;
       })
