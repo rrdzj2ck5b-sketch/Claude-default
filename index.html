@@ -591,8 +591,16 @@
     });
   }
 
-  function viaCorsProxy(base) {
-    var url = 'https://corsproxy.io/?url=' + encodeURIComponent(base);
+  function viaAllOriginsRaw(base) {
+    var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(base);
+    return fetchWithTimeout(url, 6000).then(function(r) {
+      if (!r.ok) return rejectWithDetail(r);
+      return r.json();
+    });
+  }
+
+  function viaThingProxy(base) {
+    var url = 'https://thingproxy.freeboard.io/fetch/' + base;
     return fetchWithTimeout(url, 6000).then(function(r) {
       if (!r.ok) return rejectWithDetail(r);
       return r.json();
@@ -605,8 +613,14 @@
       '&darwin=false&train_status=passenger&destination=ECR';
     return viaAllOrigins(base)
       .catch(function() { return viaCodeTabs(base); })
-      .catch(function() { return viaCorsProxy(base); })
+      .catch(function() { return viaAllOriginsRaw(base); })
+      .catch(function() { return viaThingProxy(base); })
       .then(function(data) {
+        if (!data || !data.departures) {
+          var detail = data && data.error;
+          throw new Error('Trains: unexpected response' +
+            (detail ? ' (' + (detail.message || detail) + ')' : ''));
+        }
         var now    = new Date();
         var cutoff = new Date(now.getTime() - 2 * 60 * 1000);
         var all    = (data.departures && data.departures.all) || [];
