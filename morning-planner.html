@@ -537,12 +537,21 @@
       .catch(function(e) { state.wxErr = e.message; });
   }
 
-  function fetchTrains() {
-    var base = 'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
-      '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
-      '&darwin=false&train_status=passenger&destination=ECR';
+  function fetchWithTimeout(url, ms) {
+    var ctrl  = new AbortController();
+    var timer = setTimeout(function() { ctrl.abort(); }, ms);
+    return fetch(url, { signal: ctrl.signal }).then(function(r) {
+      clearTimeout(timer);
+      return r;
+    }, function(e) {
+      clearTimeout(timer);
+      throw e;
+    });
+  }
+
+  function viaAllOrigins(base) {
     var url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
-    return fetch(url)
+    return fetchWithTimeout(url, 6000)
       .then(function(r) {
         if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
         return r.json();
@@ -550,7 +559,34 @@
       .then(function(wrapper) {
         if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200)
           throw new Error('Trains HTTP ' + wrapper.status.http_code);
-        var data = JSON.parse(wrapper.contents);
+        return JSON.parse(wrapper.contents);
+      });
+  }
+
+  function viaCodeTabs(base) {
+    var url = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(base);
+    return fetchWithTimeout(url, 6000).then(function(r) {
+      if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function viaCorsProxy(base) {
+    var url = 'https://corsproxy.io/?url=' + encodeURIComponent(base);
+    return fetchWithTimeout(url, 6000).then(function(r) {
+      if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function fetchTrains() {
+    var base = 'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
+      '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
+      '&darwin=false&train_status=passenger&destination=ECR';
+    return viaAllOrigins(base)
+      .catch(function() { return viaCodeTabs(base); })
+      .catch(function() { return viaCorsProxy(base); })
+      .then(function(data) {
         var now    = new Date();
         var cutoff = new Date(now.getTime() - 2 * 60 * 1000);
         var all    = (data.departures && data.departures.all) || [];
