@@ -233,7 +233,7 @@
 
 </div>
 <script>
-  // ── state ─────────────────────────────────────────────────────────────────
+  // ── state ──────────────────────────────────────────────────────────────────
   var state = {
     tube: {}, tubeErr: null,
     wx: null, wxErr: null,
@@ -549,6 +549,24 @@
     });
   }
 
+  function trainsErrorDetail(text) {
+    try {
+      var body = JSON.parse(text);
+      return body.error || body.error_description || body.message || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function rejectWithDetail(r) {
+    return r.text().then(function(t) {
+      var detail = trainsErrorDetail(t);
+      throw new Error('Trains HTTP ' + r.status + (detail ? ': ' + detail : ''));
+    }, function() {
+      throw new Error('Proxy HTTP ' + r.status);
+    });
+  }
+
   function viaAllOrigins(base) {
     var url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
     return fetchWithTimeout(url, 6000)
@@ -557,8 +575,10 @@
         return r.json();
       })
       .then(function(wrapper) {
-        if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200)
-          throw new Error('Trains HTTP ' + wrapper.status.http_code);
+        if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200) {
+          var detail = trainsErrorDetail(wrapper.contents);
+          throw new Error('Trains HTTP ' + wrapper.status.http_code + (detail ? ': ' + detail : ''));
+        }
         return JSON.parse(wrapper.contents);
       });
   }
@@ -566,7 +586,7 @@
   function viaCodeTabs(base) {
     var url = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(base);
     return fetchWithTimeout(url, 6000).then(function(r) {
-      if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+      if (!r.ok) return rejectWithDetail(r);
       return r.json();
     });
   }
@@ -574,7 +594,7 @@
   function viaCorsProxy(base) {
     var url = 'https://corsproxy.io/?url=' + encodeURIComponent(base);
     return fetchWithTimeout(url, 6000).then(function(r) {
-      if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+      if (!r.ok) return rejectWithDetail(r);
       return r.json();
     });
   }
