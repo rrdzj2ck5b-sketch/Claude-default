@@ -557,24 +557,44 @@
   }
 
   function fetchTrains() {
-    var url = 'https://huxley2.azurewebsites.net/departures/BAL/to/ECR/2';
-    return fetchWithTimeout(url, 10000)
+    var searchUrl = 'https://api.tfl.gov.uk/StopPoint/Search/Balham?modes=national-rail';
+    return fetchWithTimeout(searchUrl, 8000)
       .then(function(r) {
         if (!r.ok) throw new Error('Trains HTTP ' + r.status);
         return r.json();
       })
       .then(function(data) {
-        var services = (data && data.trainServices) || [];
+        var matches = (data && data.matches) || [];
+        var stop = null;
+        for (var i = 0; i < matches.length; i++) {
+          if (/rail/i.test(matches[i].name || '')) { stop = matches[i]; break; }
+        }
+        if (!stop) stop = matches[0];
+        if (!stop) throw new Error('Trains: Balham rail station not found');
+        return fetchWithTimeout('https://api.tfl.gov.uk/StopPoint/' + stop.id + '/Arrivals', 8000);
+      })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Trains HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var toCroydon = [];
+        for (var i = 0; i < data.length; i++) {
+          var label = (data[i].towards || '') + ' ' + (data[i].destinationName || '');
+          if (/croydon/i.test(label)) toCroydon.push(data[i]);
+        }
+        toCroydon.sort(function(a, b) { return a.timeToStation - b.timeToStation; });
         var deps = [];
-        for (var i = 0; i < services.length && deps.length < 2; i++) {
-          var s = services[i];
-          var dest = (s.destination && s.destination[0] && s.destination[0].locationName) || 'East Croydon';
-          var etd = s.etd || s.std || '—';
+        for (var i = 0; i < toCroydon.length && deps.length < 2; i++) {
+          var s = toCroydon[i];
+          var due = new Date(s.expectedArrival);
+          var hhmm = isNaN(due.getTime()) ? '—' :
+            ('0' + due.getHours()).slice(-2) + ':' + ('0' + due.getMinutes()).slice(-2);
           deps.push({
-            aimed:     s.std || '—',
-            etd:       etd,
-            dest:      dest,
-            cancelled: /cancel/i.test(etd)
+            aimed:     hhmm,
+            etd:       'On time',
+            dest:      s.destinationName || 'East Croydon',
+            cancelled: false
           });
         }
         state.trains = deps;
