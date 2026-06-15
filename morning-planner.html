@@ -305,9 +305,9 @@
     if (next && next.cancelled)
       return {leave:'07:15', lvl:'warn',
         msg:'Next SWR train cancelled — leave at 07:15 and check the following one.' + umb};
-    if (next && next.expected !== next.aimed)
+    if (next && next.etd && next.etd !== 'On time' && next.etd !== next.aimed)
       return {leave:'07:20', lvl:'warn',
-        msg:'Next SWR train expected at ' + next.expected + ' — allow some margin.' + umb};
+        msg:'Next SWR train delayed (' + next.etd + ') — allow some margin.' + umb};
     return {leave:'07:20', lvl:'good',
       msg:'Northern line running well — leave at normal time.' + umb};
   }
@@ -431,9 +431,16 @@
     var out = '';
     for (var i = 0; i < state.trains.length; i++) {
       var t = state.trains[i];
-      var late    = !t.cancelled && t.expected !== t.aimed;
-      var statCls = t.cancelled ? 'cancelled' : (late ? 'late' : 'on-time');
-      var statTxt = t.cancelled ? 'Cancelled' : (late ? 'Exp ' + esc(t.expected) : 'On time');
+      var statCls, statTxt;
+      if (t.cancelled) {
+        statCls = 'cancelled'; statTxt = 'Cancelled';
+      } else if (t.etd === 'On time' || t.etd === t.aimed) {
+        statCls = 'on-time'; statTxt = 'On time';
+      } else if (/^\d{2}:\d{2}$/.test(t.etd)) {
+        statCls = 'late'; statTxt = 'Exp ' + esc(t.etd);
+      } else {
+        statCls = 'late'; statTxt = esc(t.etd);
+      }
       out += '<div class="dep-row">';
       out += '<span class="dep-aimed">' + esc(t.aimed) + '</span>';
       out += '<span class="dep-dest">' + esc(t.dest) + '</span>';
@@ -549,94 +556,26 @@
     });
   }
 
-  function trainsErrorDetail(text) {
-    try {
-      var body = JSON.parse(text);
-      return body.error || body.error_description || body.message || '';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function rejectWithDetail(r) {
-    return r.text().then(function(t) {
-      var detail = trainsErrorDetail(t);
-      throw new Error('Trains HTTP ' + r.status + (detail ? ': ' + detail : ''));
-    }, function() {
-      throw new Error('Proxy HTTP ' + r.status);
-    });
-  }
-
-  function viaAllOrigins(base) {
-    var url = 'https://api.allorigins.win/get?url=' + encodeURIComponent(base);
-    return fetchWithTimeout(url, 6000)
+  function fetchTrains() {
+    var url = 'https://huxley2.azurewebsites.net/departures/BAL/to/ECR/2';
+    return fetchWithTimeout(url, 10000)
       .then(function(r) {
-        if (!r.ok) throw new Error('Proxy HTTP ' + r.status);
+        if (!r.ok) throw new Error('Trains HTTP ' + r.status);
         return r.json();
       })
-      .then(function(wrapper) {
-        if (wrapper.status && wrapper.status.http_code && wrapper.status.http_code !== 200) {
-          var detail = trainsErrorDetail(wrapper.contents);
-          throw new Error('Trains HTTP ' + wrapper.status.http_code + (detail ? ': ' + detail : ''));
-        }
-        return JSON.parse(wrapper.contents);
-      });
-  }
-
-  function viaCodeTabs(base) {
-    var url = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(base);
-    return fetchWithTimeout(url, 6000).then(function(r) {
-      if (!r.ok) return rejectWithDetail(r);
-      return r.json();
-    });
-  }
-
-  function viaAllOriginsRaw(base) {
-    var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(base);
-    return fetchWithTimeout(url, 6000).then(function(r) {
-      if (!r.ok) return rejectWithDetail(r);
-      return r.json();
-    });
-  }
-
-  function viaThingProxy(base) {
-    var url = 'https://thingproxy.freeboard.io/fetch/' + base;
-    return fetchWithTimeout(url, 6000).then(function(r) {
-      if (!r.ok) return rejectWithDetail(r);
-      return r.json();
-    });
-  }
-
-  function fetchTrains() {
-    var base = 'https://transportapi.com/v3/uk/train/station/BAL/live.json' +
-      '?app_id=e67198f9&app_key=bf91a45e0dfeb735f036a62718802307' +
-      '&darwin=false&train_status=passenger&destination=ECR';
-    return viaAllOrigins(base)
-      .catch(function() { return viaCodeTabs(base); })
-      .catch(function() { return viaAllOriginsRaw(base); })
-      .catch(function() { return viaThingProxy(base); })
       .then(function(data) {
-        if (!data || !data.departures) {
-          var detail = data && data.error;
-          throw new Error('Trains: unexpected response' +
-            (detail ? ' (' + (detail.message || detail) + ')' : ''));
-        }
-        var now    = new Date();
-        var cutoff = new Date(now.getTime() - 2 * 60 * 1000);
-        var all    = (data.departures && data.departures.all) || [];
-        var deps   = [];
-        for (var i = 0; i < all.length; i++) {
-          var d = all[i];
-          if (!d.destination_name || d.destination_name.toLowerCase().indexOf('croydon') === -1) continue;
-          var t = parseHHMM(d.expected_departure_time || d.aimed_departure_time);
-          if (!t || t < cutoff) continue;
+        var services = (data && data.trainServices) || [];
+        var deps = [];
+        for (var i = 0; i < services.length && deps.length < 2; i++) {
+          var s = services[i];
+          var dest = (s.destination && s.destination[0] && s.destination[0].locationName) || 'East Croydon';
+          var etd = s.etd || s.std || '—';
           deps.push({
-            aimed:     d.aimed_departure_time || '—',
-            expected:  d.expected_departure_time || d.aimed_departure_time || '—',
-            dest:      d.destination_name || 'East Croydon',
-            cancelled: (d.status || '').toUpperCase().indexOf('CANCEL') !== -1
+            aimed:     s.std || '—',
+            etd:       etd,
+            dest:      dest,
+            cancelled: /cancel/i.test(etd)
           });
-          if (deps.length === 2) break;
         }
         state.trains = deps;
       })
