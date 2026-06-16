@@ -557,43 +557,32 @@
   }
 
   function fetchTrains() {
-    var searchUrl = 'https://api.tfl.gov.uk/StopPoint/Search/Balham?modes=national-rail';
-    return fetchWithTimeout(searchUrl, 8000)
+    var now  = new Date();
+    var date = now.getFullYear() +
+      ('0' + (now.getMonth() + 1)).slice(-2) +
+      ('0' + now.getDate()).slice(-2);
+    var time = ('0' + now.getHours()).slice(-2) + ('0' + now.getMinutes()).slice(-2);
+    // 910GBALHAM = Balham rail, 910GECROYDN = East Croydon rail (NaPTAN IDs)
+    var url = 'https://api.tfl.gov.uk/journey/journeyresults/910GBALHAM/to/910GECROYDN' +
+      '?nationalSearch=true&timeIs=Departing&date=' + date + '&time=' + time;
+    return fetchWithTimeout(url, 12000)
       .then(function(r) {
         if (!r.ok) throw new Error('Trains HTTP ' + r.status);
         return r.json();
       })
       .then(function(data) {
-        var matches = (data && data.matches) || [];
-        var stop = null;
-        for (var i = 0; i < matches.length; i++) {
-          if (/rail/i.test(matches[i].name || '')) { stop = matches[i]; break; }
+        if (data && data.disambiguationOptions) {
+          throw new Error('Trains: station lookup ambiguous — please report this');
         }
-        if (!stop) stop = matches[0];
-        if (!stop) throw new Error('Trains: Balham rail station not found');
-        return fetchWithTimeout('https://api.tfl.gov.uk/StopPoint/' + stop.id + '/Arrivals', 8000);
-      })
-      .then(function(r) {
-        if (!r.ok) throw new Error('Trains HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function(data) {
-        var toCroydon = [];
-        for (var i = 0; i < data.length; i++) {
-          var label = (data[i].towards || '') + ' ' + (data[i].destinationName || '');
-          if (/croydon/i.test(label)) toCroydon.push(data[i]);
-        }
-        toCroydon.sort(function(a, b) { return a.timeToStation - b.timeToStation; });
+        var journeys = (data && data.journeys) || [];
         var deps = [];
-        for (var i = 0; i < toCroydon.length && deps.length < 2; i++) {
-          var s = toCroydon[i];
-          var due = new Date(s.expectedArrival);
-          var hhmm = isNaN(due.getTime()) ? '—' :
-            ('0' + due.getHours()).slice(-2) + ':' + ('0' + due.getMinutes()).slice(-2);
+        for (var i = 0; i < journeys.length && deps.length < 2; i++) {
+          var dep = new Date(journeys[i].startDateTime);
+          if (isNaN(dep.getTime())) continue;
           deps.push({
-            aimed:     hhmm,
+            aimed:     ('0' + dep.getHours()).slice(-2) + ':' + ('0' + dep.getMinutes()).slice(-2),
             etd:       'On time',
-            dest:      s.destinationName || 'East Croydon',
+            dest:      'East Croydon',
             cancelled: false
           });
         }
